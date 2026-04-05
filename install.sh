@@ -70,7 +70,7 @@ header() { echo -e "\n${CYAN}── $* ──${NC}"; }
 prompt_input() {
   local prompt="$1" default="$2" result
   if [ "$NON_INTERACTIVE" = true ]; then echo "$default"; return; fi
-  echo -n "  $prompt [$default]: "
+  echo -n "  $prompt [$default]: " >&2
   read result <&$TTY_FD
   echo "${result:-$default}"
 }
@@ -79,11 +79,11 @@ prompt_select() {
   local prompt="$1"; shift
   local options=("$@")
   if [ "$NON_INTERACTIVE" = true ]; then echo "1"; return; fi
-  echo ""
+  echo "" >&2
   for i in "${!options[@]}"; do
-    echo "  [$((i+1))] ${options[$i]}"
+    echo "  [$((i+1))] ${options[$i]}" >&2
   done
-  echo -n "  $prompt: "
+  echo -n "  $prompt: " >&2
   local choice
   read choice <&$TTY_FD
   echo "${choice:-1}"
@@ -174,7 +174,7 @@ if [ "$NON_INTERACTIVE" = false ]; then
       case "$AUTH_CHOICE" in
         1)
           LINEAR_AUTH_METHOD="api_key"
-          echo -n "  API Key: "; read -s LINEAR_API_KEY <&$TTY_FD; echo ""
+          echo -n "  API Key: " >&2; read -s LINEAR_API_KEY <&$TTY_FD; echo "" >&2
           ;;
         2)
           LINEAR_AUTH_METHOD="oauth"
@@ -196,7 +196,7 @@ if [ "$NON_INTERACTIVE" = false ]; then
   DEV_COMMAND=$(prompt_input "Dev command" "bun run dev")
   BRANCH=$(prompt_input "Main branch" "dev")
 
-  echo -n "  Use GitNexus for code analysis? [Y/n]: "; read USE_GITNEXUS <&$TTY_FD
+  echo -n "  Use GitNexus for code analysis? [Y/n]: " >&2; read USE_GITNEXUS <&$TTY_FD
   USE_GITNEXUS="${USE_GITNEXUS:-Y}"
 fi
 
