@@ -295,6 +295,11 @@ configure_mcp() {
 
   mkdir -p "$(dirname "$config_file")" 2>/dev/null || true
 
+  # Remove broken symlinks
+  if [ -L "$config_file" ] && [ ! -e "$config_file" ]; then
+    rm -f "$config_file"
+  fi
+
   if [ -f "$config_file" ] && [ -s "$config_file" ]; then
     # Merge into existing config
     jq --arg key "$mcp_key" --argjson val "$mcp_value" \
