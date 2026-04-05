@@ -58,7 +58,7 @@ curl -fsSL https://...install.sh | bash -s -- --project-dir /path/to/project
 
 ### Gemini CLI
 ```
-/qa:scan SKIN-101                    # Slash command (recommended)
+/scan SKIN-101                       # Prompt template (recommended)
 @qa-orchestrator scan SKIN-101       # Direct agent delegation
 ```
 

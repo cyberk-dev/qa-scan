@@ -436,13 +436,13 @@ if [ "$HAS_GEMINI" = true ]; then
     [ -f "$f" ] || continue
     convert_agent_for_gemini "$f" "$WORKSPACE/.gemini/agents/$(basename "$f")"
   done
-  # Gemini slash command: /qa:scan
-  mkdir -p "$WORKSPACE/.gemini/commands/qa"
-  cp adapters/gemini-command/scan.toml "$WORKSPACE/.gemini/commands/qa/scan.toml" 2>/dev/null || true
+  # Gemini prompt template: /scan
+  mkdir -p "$WORKSPACE/.gemini/prompts"
+  cp adapters/gemini-prompt/scan.md "$WORKSPACE/.gemini/prompts/scan.md" 2>/dev/null || true
   # Gemini skill: auto-activate on QA requests
   mkdir -p "$WORKSPACE/.gemini/skills/qa-scan"
   cp adapters/gemini-skill/SKILL.md "$WORKSPACE/.gemini/skills/qa-scan/SKILL.md" 2>/dev/null || true
-  info "Gemini agents + /qa:scan command + skill installed"
+  info "Gemini agents + /scan prompt + skill installed"
 fi
 
 # Antigravity
@@ -467,7 +467,7 @@ if [ "$HAS_CLAUDE" = true ]; then
   echo "  Claude Code:  /qa-scan $(echo "$REPO_KEY" | tr '[:lower:]' '[:upper:]')-001"
 fi
 if [ "$HAS_GEMINI" = true ]; then
-  echo "  Gemini CLI:   /qa:scan $(echo "$REPO_KEY" | tr '[:lower:]' '[:upper:]')-001"
+  echo "  Gemini CLI:   /scan $(echo "$REPO_KEY" | tr '[:lower:]' '[:upper:]')-001"
 fi
 echo "  Any agent:    Follow .agents/qa-scan/workflow.md"
 echo ""
