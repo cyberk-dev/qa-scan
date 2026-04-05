@@ -1,6 +1,6 @@
 # QA Scan — Universal Workflow
 
-Automated QA pipeline: fetch issue → analyze → scout code → generate test → run → adversarial verification → structured report.
+Automated QA pipeline: analyze issue → scout code → analyze flow → generate test → run → verify coverage → structured report.
 
 ## Usage
 
@@ -55,25 +55,18 @@ Scans all issues currently in QA status:
 
 ---
 
-## Pipeline (9 Steps)
+## Pipeline (8 Steps)
 
-### Step 0 — Project Context + Server Health
+### Step 0 — Project Context + Server Health (Claude agents: automatic)
 
-**0a. Read project docs** before testing:
-- `{repo_path}/README.md` — tech stack, scripts, dev setup
-- `{repo_path}/CLAUDE.md` or `AGENTS.md` — coding rules, architecture (if exists)
-- `{repo_path}/package.json` → scripts section
-- Pass context to subsequent steps (especially test generation)
+Before running the pipeline, verify:
+1. Read project docs (`README.md`, `CLAUDE.md`, `package.json`) — understand tech stack
+2. Dev server health check: `curl -s -o /dev/null -w "%{http_code}" {base_url}`
+   - If `200`: continue
+   - If fail: auto-start via `dev_command` from config, poll 2s intervals, timeout 30s
+   - If still fail: VERDICT: PARTIAL ("Server could not be started")
 
-**0b. Dev server health check:**
-```bash
-curl -s -o /dev/null -w "%{http_code}" {base_url}
-```
-- 200 → continue
-- Fail → auto-start via `dev_command` from config, poll every 2s, timeout 30s
-- Still fail → VERDICT: PARTIAL
-
-### Step 1 — Fetch Issue
+### Step 1 — Fetch + Analyze Issue
 
 Get issue details from the tracking system.
 
@@ -99,7 +92,7 @@ github.com/...    → GitHub   → parse URL → match repo field
 
 **Output:** `{title, description, labels, branch, source}`
 
-### Step 2 — Analyze Issue → Test Requirements
+### Step 1b — Analyze Issue → Test Requirements
 
 Load: `./references/analyze-issue.md`
 
@@ -114,7 +107,7 @@ Feed issue title + description to LLM with the analyze-issue prompt.
 
 If confidence < 0.5 → warn user, suggest manual testing.
 
-### Step 3 — Scout Code
+### Step 2 — Scout Code
 
 Load: `./references/scout-code.md`
 
@@ -132,7 +125,23 @@ Find relevant source code for the feature area.
 
 **Output:** List of relevant files with purpose of each.
 
-### Step 4 — Generate Test
+### Step 2b — Analyze Flow
+
+Load: `./references/analyze-flow.md`
+
+Read the code files from Step 3 and extract all testable states, branches, and user actions.
+
+**What to extract:**
+- UI states: loading, success, error, empty, auth-required
+- Conditional renders: `{condition && ...}`, ternary operators
+- User actions: onClick, onSubmit, onChange handlers
+- API call states: useQuery/useMutation loading/error/success
+
+**Output:** Test coverage matrix (JSON) — states[], actions[], coverage_summary.
+
+> **Note:** This step runs automatically in the Claude agents pipeline (qa-flow-analyzer). For Gemini/Antigravity, manually read the top 3-5 files from Step 3 and extract states before generating tests.
+
+### Step 3 — Generate Test
 
 Load: `./references/generate-test.md`
 
@@ -148,7 +157,7 @@ Generate Playwright E2E test from requirements + code context.
 
 **Output:** Save test file to `evidence/{issue-id}/test.spec.ts`
 
-### Step 5 — Run Test
+### Step 4 — Run Test
 
 Execute the generated test with Playwright.
 
@@ -162,55 +171,19 @@ Video, trace, and screenshots auto-captured per `playwright.config.ts`.
 
 **Output:** Test results (pass/fail), artifacts in `evidence/{issue-id}/`
 
-### Step 5b — Self-Healing (if test fails on selector)
+### Step 5 — Coverage / Adversarial Verification
 
-If Step 5 test fails with a selector error (not a genuine application bug):
+**Claude agents:** Load `./references/coverage-verifier.md` — compare test results vs flow analysis matrix.
+**Gemini/Antigravity:** Load `./references/adversarial-verifier.md` — try to break the implementation.
 
-1. **Capture DOM snapshot:**
-   ```bash
-   # The trace file from Step 5 contains DOM snapshots
-   # Or re-navigate and capture: page.content()
-   ```
-
-2. **Check flaky memory:**
-   Read `evidence/flaky-memory.json` for known-bad selectors.
-
-3. **Load self-heal prompt:**
-   Load: `./references/self-heal-test.md`
-   
-   Feed: failed test code + error message + DOM snapshot + flaky memory
-
-4. **LLM fixes selectors** → generates corrected test file
-
-5. **Re-run test** (max 1 retry):
-   ```bash
-   cd .agents/qa-scan
-   QA_BASE_URL={base_url} npx playwright test evidence/{issue-id}/test.spec.ts \
-     --config=scripts/playwright.config.ts
-   ```
-
-6. **Update flaky memory:**
-   If fix worked → append entry to `evidence/flaky-memory.json`
-
-7. **If still fails** → proceed to Step 6 (adversarial verification) with failure context.
-
-**Config:** `self_healing_retries` in qa.config.yaml (default: 1)
-
-### Step 6 — Adversarial Verification
-
-Load: `./references/adversarial-verifier.md`
-
-**THIS IS A SEPARATE READ-ONLY VERIFICATION STEP.**
-
-Spawn a verification agent (or switch to verification mode) that:
+READ-ONLY verification step:
 - **CANNOT** modify project files
 - **MUST** run actual commands (reading code is not verification)
-- **MUST** include at least 1 adversarial probe (boundary values, rapid interactions, etc.)
 - **CAN** write ephemeral scripts to `/tmp/qa-scan/{issue-id}/`
 
 The verifier receives:
-- Issue description + expected behavior
-- Test results from Step 5
+- Test results from Step 4
+- Test matrix from Step 2b (if available)
 - Feature area + relevant code files
 
 Every check must follow structured format:
@@ -219,29 +192,22 @@ Every check must follow structured format:
 **Command run:** [exact command]
 **Output observed:** [terminal output]
 **Expected vs Actual:** [comparison]
-**Result:** PASS/FAIL
+**Result:** PASS/FAIL or COVERED/GAP
 ```
 
-### Step 7 — Synthesize Report
+Load: `.agents/qa-scan/references/verdict-rules.md`
+
+### Step 6 — Synthesize Report
 
 Load: `./references/synthesize-report.md`
 
-Combine test results (Step 5) + adversarial verification (Step 6) into structured report.
+Combine test results (Step 4) + verification results (Step 5) into structured report.
 
 Save to: `evidence/{issue-id}/report.md`
 
-Report MUST end with exactly one of:
-```
-VERDICT: PASS
-VERDICT: FAIL
-VERDICT: PARTIAL
-```
+Load: `.agents/qa-scan/references/verdict-rules.md`
 
-- **PASS**: All tests pass + adversarial probes pass
-- **FAIL**: Any check fails (include reproduction steps)
-- **PARTIAL**: Environmental limitation only (tool unavailable, server can't start)
-
-### Step 8 — Post Report (Optional)
+### Step 7 — Post Report (Optional)
 
 Post the QA report to the issue tracking system.
 
@@ -303,3 +269,77 @@ repos:
 - If Step 4 generates invalid test → log error, skip to Step 6 (verify manually)
 - If Step 5 test fails → proceed to Step 6 anyway (verifier may find different issues)
 - If Step 6 environment issue → VERDICT: PARTIAL with explanation
+
+---
+
+## Auto-Run (Cron / Zero-Touch)
+
+The zero-touch orchestrator polls for QA issues and runs the pipeline automatically.
+
+### Quick Start (any OS)
+
+```bash
+# Run once — scan all repos
+bash .agents/qa-scan/scripts/qa-orchestrator.sh
+
+# Watch mode — poll every 10 minutes
+bash .agents/qa-scan/scripts/qa-orchestrator.sh --watch 600
+
+# Filter by repo
+bash .agents/qa-scan/scripts/qa-orchestrator.sh --repo skin-agent-fe
+
+# Dry run — preview without executing
+bash .agents/qa-scan/scripts/qa-orchestrator.sh --dry-run
+```
+
+### macOS (launchd)
+
+Create `~/Library/LaunchAgents/com.cyberk.qa-scan.plist` (replace `WORKSPACE_PATH` with your actual path):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.cyberk.qa-scan</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>bash</string>
+    <string>WORKSPACE_PATH/.agents/qa-scan/scripts/qa-orchestrator.sh</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>600</integer>
+  <key>WorkingDirectory</key>
+  <string>WORKSPACE_PATH</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+    <key>HOME</key>
+    <string>/Users/YOUR_USER</string>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/tmp/qa-scan-cron.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/qa-scan-cron.log</string>
+</dict>
+</plist>
+```
+
+```bash
+launchctl load ~/Library/LaunchAgents/com.cyberk.qa-scan.plist
+```
+
+### Linux (crontab)
+
+```bash
+crontab -e
+# Add (replace WORKSPACE_PATH):
+*/10 * * * * cd WORKSPACE_PATH && PATH="/usr/local/bin:$PATH" bash .agents/qa-scan/scripts/qa-orchestrator.sh >> /tmp/qa-scan-cron.log 2>&1
+```
+
+### Tracker
+
+Results tracked in `evidence/qa-tracker.json` — prevents re-scanning the same issue.
+Labels auto-applied to issues: `qa-auto-passed` / `qa-auto-failed` / `qa-needs-manual`.

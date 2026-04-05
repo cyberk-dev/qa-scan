@@ -1,61 +1,59 @@
 #!/bin/bash
-# QA Scan — Environment Verification
-# Checks: dependencies, config, prompts, agents, adapters
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+AGENTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKSPACE="$(cd "$AGENTS_DIR/../.." && pwd)"
 
 ERRORS=0
 WARNINGS=0
 
 echo "=== QA Scan Environment Check ==="
-echo "Repo: $REPO_DIR"
 echo ""
 
 # Core dependencies
 echo "--- Core ---"
 command -v bun >/dev/null 2>&1 && echo "✓ Bun $(bun --version)" || { echo "✗ Bun not installed"; ERRORS=$((ERRORS+1)); }
-cd "$REPO_DIR" && npx playwright --version >/dev/null 2>&1 && echo "✓ Playwright $(npx playwright --version 2>/dev/null)" || { echo "✗ Playwright not installed (run: bun run setup)"; ERRORS=$((ERRORS+1)); }
+cd "$AGENTS_DIR" && npx playwright --version >/dev/null 2>&1 && echo "✓ Playwright $(npx playwright --version 2>/dev/null)" || { echo "✗ Playwright not installed (run: bun run setup)"; ERRORS=$((ERRORS+1)); }
 
 # Config files
 echo ""
 echo "--- Config ---"
-[ -f "$REPO_DIR/config/qa.config.yaml" ] && echo "✓ qa.config.yaml" || { echo "⚠ qa.config.yaml missing (run install.sh to configure)"; WARNINGS=$((WARNINGS+1)); }
-[ -f "$REPO_DIR/config/qa.config.example.yaml" ] && echo "✓ qa.config.example.yaml" || { echo "✗ qa.config.example.yaml missing"; ERRORS=$((ERRORS+1)); }
-[ -f "$REPO_DIR/workflow.md" ] && echo "✓ workflow.md" || { echo "✗ workflow.md missing"; ERRORS=$((ERRORS+1)); }
-[ -f "$REPO_DIR/scripts/playwright.config.ts" ] && echo "✓ playwright.config.ts" || { echo "✗ playwright.config.ts missing"; ERRORS=$((ERRORS+1)); }
+[ -f "$AGENTS_DIR/config/qa.config.yaml" ] && echo "✓ qa.config.yaml" || { echo "✗ qa.config.yaml missing"; ERRORS=$((ERRORS+1)); }
+[ -f "$AGENTS_DIR/workflow.md" ] && echo "✓ workflow.md" || { echo "✗ workflow.md missing"; ERRORS=$((ERRORS+1)); }
+[ -f "$AGENTS_DIR/scripts/playwright.config.ts" ] && echo "✓ playwright.config.ts" || { echo "✗ playwright.config.ts missing"; ERRORS=$((ERRORS+1)); }
 
 # Prompt references
 echo ""
 echo "--- Prompts ---"
-for prompt in analyze-issue generate-test scout-code adversarial-verifier synthesize-report self-heal-test vision-analyze config-schema gemini-adapter-guide; do
-  [ -f "$REPO_DIR/references/$prompt.md" ] && echo "✓ $prompt.md" || { echo "✗ $prompt.md missing"; ERRORS=$((ERRORS+1)); }
+for prompt in analyze-issue analyze-flow generate-test scout-code adversarial-verifier coverage-verifier synthesize-report adversarial-probes verdict-rules; do
+  [ -f "$AGENTS_DIR/references/$prompt.md" ] && echo "✓ $prompt.md" || { echo "✗ $prompt.md missing"; ERRORS=$((ERRORS+1)); }
 done
 
-# Agent definitions (in repo)
-echo ""
-echo "--- Agents ---"
-for agent in qa-orchestrator qa-issue-analyzer qa-code-scout qa-test-generator qa-test-runner qa-adversarial-verifier qa-report-synthesizer; do
-  [ -f "$REPO_DIR/agents/$agent.md" ] && echo "✓ $agent" || { echo "✗ $agent.md missing"; ERRORS=$((ERRORS+1)); }
-done
-
-# Adapter templates (in repo)
+# Agent adapters
 echo ""
 echo "--- Adapters ---"
-[ -f "$REPO_DIR/adapters/claude-skill.md" ] && echo "✓ Claude adapter template" || { echo "✗ claude-skill.md missing"; ERRORS=$((ERRORS+1)); }
-[ -f "$REPO_DIR/adapters/gemini-adapter.md" ] && echo "✓ Gemini adapter template" || { echo "✗ gemini-adapter.md missing"; ERRORS=$((ERRORS+1)); }
-[ -f "$REPO_DIR/adapters/antigravity-adapter.md" ] && echo "✓ Antigravity adapter template" || { echo "✗ antigravity-adapter.md missing"; ERRORS=$((ERRORS+1)); }
+[ -f "$WORKSPACE/.claude/skills/qa-scan/SKILL.md" ] && echo "✓ Claude adapter" || { echo "⚠ Claude adapter missing"; WARNINGS=$((WARNINGS+1)); }
+[ -f "$WORKSPACE/.gemini/qa-scan.md" ] && echo "✓ Gemini adapter" || { echo "⚠ Gemini adapter missing"; WARNINGS=$((WARNINGS+1)); }
+[ -f "$WORKSPACE/.antigravity/qa-scan.md" ] && echo "✓ Antigravity adapter" || { echo "⚠ Antigravity adapter missing"; WARNINGS=$((WARNINGS+1)); }
 
-# Scripts
+# Agent definitions
 echo ""
-echo "--- Scripts ---"
-[ -f "$REPO_DIR/scripts/qa-orchestrator.sh" ] && echo "✓ qa-orchestrator.sh" || { echo "✗ qa-orchestrator.sh missing"; ERRORS=$((ERRORS+1)); }
-[ -f "$REPO_DIR/scripts/auth-setup.ts" ] && echo "✓ auth-setup.ts" || { echo "✓ auth-setup.ts (optional)"; }
+echo "--- Agents ---"
+for agent in qa-orchestrator qa-issue-analyzer qa-code-scout qa-flow-analyzer qa-test-generator qa-test-runner qa-adversarial-verifier qa-coverage-verifier qa-report-synthesizer; do
+  [ -f "$WORKSPACE/.claude/agents/$agent.md" ] && echo "✓ $agent" || { echo "Warning: $agent missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
+done
 
-# Evidence
+# Orchestrator script
+echo ""
+echo "--- Zero-Touch ---"
+[ -f "$AGENTS_DIR/scripts/qa-orchestrator.sh" ] && echo "✓ qa-orchestrator.sh" || { echo "✗ qa-orchestrator.sh missing"; ERRORS=$((ERRORS+1)); }
+[ -f "$AGENTS_DIR/evidence/qa-tracker.json" ] && echo "✓ qa-tracker.json" || { echo "Warning: qa-tracker.json missing (will be created on first run)"; WARNINGS=$((WARNINGS+1)); }
+[ -f "$AGENTS_DIR/evidence/hotspot-memory.json" ] && echo "✓ hotspot-memory.json" || { echo "Warning: hotspot-memory.json missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
+
+# Evidence dir
 echo ""
 echo "--- Evidence ---"
-[ -d "$REPO_DIR/evidence" ] && echo "✓ evidence/" || { echo "✗ evidence/ missing"; ERRORS=$((ERRORS+1)); }
+[ -d "$AGENTS_DIR/evidence" ] && echo "✓ evidence/" || { echo "✗ evidence/ missing"; ERRORS=$((ERRORS+1)); }
 
 # Summary
 echo ""
@@ -63,7 +61,7 @@ echo "========================"
 if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
   echo "✓ All checks passed"
 elif [ $ERRORS -eq 0 ]; then
-  echo "⚠ $WARNINGS warnings (run install.sh to configure)"
+  echo "⚠ $WARNINGS warnings (run install.sh to fix)"
 else
   echo "✗ $ERRORS errors, $WARNINGS warnings"
 fi

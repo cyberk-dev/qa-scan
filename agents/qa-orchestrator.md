@@ -1,6 +1,6 @@
 ---
 name: qa-orchestrator
-description: "Orchestrate QA scan pipeline: spawn 6 specialized sub-agents sequentially, pass structured data between them, post results to Linear/GitHub. Use when /qa-scan is invoked."
+description: "Orchestrate QA scan pipeline: spawn 8 specialized sub-agents sequentially, pass structured data between them, post results to Linear/GitHub. Use when /qa-scan is invoked."
 model: sonnet
 tools: Read, Grep, Glob, Agent, SendMessage, WebFetch
 ---
@@ -23,19 +23,9 @@ Prompts: `.agents/qa-scan/references/` (agents load these themselves).
 - Pass this context to all sub-agents (especially test-generator)
 
 **0b. Dev server health check:**
-```bash
-curl -s -o /dev/null -w "%{http_code}" {base_url}
-```
-- If `200`: Server running, continue pipeline
-- If fail: Auto-start using `dev_command` from config:
-  ```bash
-  cd {repo_path} && {dev_command} &
-  # Poll health every 2s, timeout 30s
-  for i in $(seq 1 15); do
-    curl -s -o /dev/null -w "%{http_code}" {base_url} | grep -q "200" && break
-    sleep 2
-  done
-  ```
+Use `WebFetch({url: base_url})` to check server status.
+- If success (HTTP 200): Server running, continue pipeline
+- If fail: Spawn `qa-test-runner` to auto-start using `dev_command` from config (test-runner has Bash tool)
 - If still fail after 30s: Report as VERDICT: PARTIAL ("Server could not be started")
 
 ### Step 1: Analyze Issue
@@ -55,20 +45,37 @@ Spawn agent: `qa-code-scout`
 Input: feature_area + repo path + gitnexus flag
 Output: list of relevant files
 
+### Step 2b: Analyze Flow
+**Guard:** If Step 2 returns 0 relevant files, skip this step and proceed to Step 3 with test_scenarios only (no test_matrix). Log: "No files found — falling back to issue-only test generation."
+
+Spawn agent: `qa-flow-analyzer`
+Input: relevant_files (from Step 2) + feature_area + test_scenarios (from Step 1)
+Output: test_matrix JSON (states[], actions[], coverage_summary)
+
+This agent reads the actual source code files and extracts every testable state (loading, error, empty, auth, success variants), conditional render, and user action. The test_matrix ensures test-generator creates comprehensive tests, not just issue-description-based ones.
+
 ### Step 3: Generate Test
 Spawn agent: `qa-test-generator`
-Input: test_scenarios + code_context + base_url + issue_id
+Input: test_scenarios + code_context + base_url + issue_id + **test_matrix** (from Step 2b)
 Output: test file path (evidence/{issue-id}/test.spec.ts)
+
+The test-generator now receives the test_matrix and generates one test per matrix state/action, in addition to issue-specific scenarios.
 
 ### Step 4: Run Test
 Spawn agent: `qa-test-runner`
 Input: test file path + playwright config path + base_url
 Output: results (pass/fail), artifact paths
 
-### Step 5: Adversarial Verification
-Spawn agent: `qa-adversarial-verifier` (background)
-Input: issue description + test results + feature_area + relevant files
-Output: structured verification checks + verdict contribution
+### Step 5: Coverage Verification
+**Guard:** If no test_matrix (Step 2b was skipped), spawn `qa-adversarial-verifier` instead (fallback to legacy behavior).
+
+Spawn agent: `qa-coverage-verifier` (background)
+Input: test_matrix (from Step 2b) + test_results (from Step 4) + test_file path + base_url
+Output: coverage report (coverage %, gaps list) + VERDICT contribution
+
+The coverage verifier maps test results against the flow analysis matrix to identify untested states. It independently verifies critical gaps (error, auth) via curl.
+
+**Wait strategy:** Coverage-verifier runs in background (timeout: 5 min). Before Step 6 (report), orchestrator MUST wait for coverage-verifier to complete. Use `SendMessage` to check completion status. If timeout reached, proceed with available results and mark verification as PARTIAL.
 
 ### Step 6: Synthesize Report
 Spawn agent: `qa-report-synthesizer`
@@ -90,8 +97,33 @@ If invoked with --all:
 4. Run pipeline for each new issue
 5. Generate batch summary
 
+## Step 8: Update Hotspot Memory (after FAIL verdict)
+
+If VERDICT = FAIL or PARTIAL:
+1. Read the report to extract failed file paths
+2. Read `.agents/qa-scan/evidence/hotspot-memory.json`
+3. For each failed file:
+   - If file already in hotspot: increment `bug_count`
+   - If new: append entry with `bug_count: 1`
+4. Write updated hotspot-memory.json
+
+Entry format:
+```json
+{
+  "file": "src/features/product/ingredient-list.tsx",
+  "issue_id": "SKIN-101",
+  "fail_reason": "Ingredient list empty on slow connection",
+  "date": "2026-04-05",
+  "bug_count": 1
+}
+```
+
+This feeds into test-generator: files with `bug_count >= 2` get extra-thorough tests.
+
+**Concurrency:** Read-modify-write — if batch mode processes multiple issues, update hotspot sequentially (not in parallel) to avoid lost writes.
+
 ## Rules
-- NEVER write files directly — delegate to sub-agents
+- NEVER write files directly — delegate to sub-agents (except hotspot-memory.json updates)
 - NEVER run bash commands — delegate to test-runner
 - Pass structured data (JSON) between agents via prompt
 - If any agent fails, log error and continue to next step

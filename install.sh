@@ -1,294 +1,104 @@
 #!/bin/bash
-set -euo pipefail
-# QA Scan — 1-command installer
-#
-# Usage:
-#   curl -fsSL https://raw.githubusercontent.com/cyberk-dev/qa-scan/main/install.sh | bash
-#   bash install.sh [--dir PATH] [--project-dir PATH] [--non-interactive]
-#
-# What it does:
-#   1. Auto-installs Bun (if missing)
-#   2. Clones/updates qa-scan repo
-#   3. Installs Playwright + Chromium
-#   4. Interactive config wizard (or template copy)
-#   5. Detects AI agents → installs adapters
-#   6. Runs verification
+set -e
 
-INSTALL_DIR="${HOME}/.qa-scan"
-PROJECT_DIR="."
-INTERACTIVE=true
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+AGENTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKSPACE="$(cd "$AGENTS_DIR/../.." && pwd)"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --dir) INSTALL_DIR="$2"; shift 2 ;;
-    --project-dir) PROJECT_DIR="$2"; shift 2 ;;
-    --non-interactive) INTERACTIVE=false; shift ;;
-    -h|--help)
-      echo "Usage: $0 [--dir PATH] [--project-dir PATH] [--non-interactive]"
-      echo ""
-      echo "  --dir PATH           Install location (default: ~/.qa-scan)"
-      echo "  --project-dir PATH   Project to configure QA for (default: .)"
-      echo "  --non-interactive    Skip config wizard, use template"
-      exit 0
-      ;;
-    *) shift ;;
-  esac
-done
+cd "$AGENTS_DIR"
 
-echo ""
-echo "╔══════════════════════════════════╗"
-echo "║      QA Scan — Installer         ║"
-echo "╚══════════════════════════════════╝"
-echo ""
+echo "=== QA Scan Setup ==="
 
-# ──────────────────────────────────
-# 0. Auto-install Bun (if missing)
-# ──────────────────────────────────
-if ! command -v bun >/dev/null 2>&1; then
-  echo "→ Bun not found. Installing..."
-  curl -fsSL https://bun.sh/install | bash
-  export BUN_INSTALL="${HOME}/.bun"
-  export PATH="${BUN_INSTALL}/bin:${PATH}"
-  echo "  ✓ Bun installed: $(bun --version)"
-  echo ""
-fi
-
-# ──────────────────────────────────
-# 1. Clone or update repo
-# ──────────────────────────────────
-if [ -d "${INSTALL_DIR}/.git" ]; then
-  echo "→ Updating existing installation..."
-  cd "${INSTALL_DIR}" && git pull --quiet
-else
-  echo "→ Installing qa-scan to ${INSTALL_DIR}..."
-  git clone --quiet https://github.com/cyberk-dev/qa-scan.git "${INSTALL_DIR}"
-fi
-cd "${INSTALL_DIR}"
-echo "  ✓ Repo ready"
-
-# ──────────────────────────────────
-# 2. Install dependencies
-# ──────────────────────────────────
-echo "→ Installing dependencies..."
-bun install --quiet 2>/dev/null || bun install
-echo "→ Installing Chromium for Playwright..."
+# 1. Install dependencies
+echo "→ Installing Playwright..."
+bun install
 npx playwright install chromium
-mkdir -p evidence
-echo "  ✓ Dependencies installed"
-echo ""
 
-# ──────────────────────────────────
-# 3. Config setup (interactive or template)
-# ──────────────────────────────────
-if [ ! -f config/qa.config.yaml ]; then
-  if [ "${INTERACTIVE}" = true ]; then
-    echo "╔══════════════════════════════════╗"
-    echo "║    Project Configuration         ║"
-    echo "╚══════════════════════════════════╝"
-    echo "(Press Enter for defaults)"
-    echo ""
+# 2. Create evidence dir + hotspot memory
+mkdir -p evidence/logs
+[ -f evidence/hotspot-memory.json ] || echo "[]" > evidence/hotspot-memory.json
+[ -f evidence/qa-tracker.json ] || echo "[]" > evidence/qa-tracker.json
+[ -f evidence/flaky-memory.json ] || echo "[]" > evidence/flaky-memory.json
 
-    read -p "  Project path [$(cd "${PROJECT_DIR}" && pwd)]: " PROJECT_PATH
-    PROJECT_PATH="${PROJECT_PATH:-$(cd "${PROJECT_DIR}" && pwd)}"
+# 3. Create thin adapters for all 3 agent systems
+echo "→ Creating agent adapters..."
 
-    read -p "  Dev server URL [http://localhost:3000]: " BASE_URL
-    BASE_URL="${BASE_URL:-http://localhost:3000}"
+# Claude Code adapter
+mkdir -p "$WORKSPACE/.claude/skills/qa-scan"
+cat > "$WORKSPACE/.claude/skills/qa-scan/SKILL.md" << 'CLAUDE_ADAPTER'
+---
+name: qa-scan
+description: "QA automation: analyze issue → scout code → generate + run Playwright E2E test → adversarial verification → structured VERDICT report"
+version: 1.0.0
+argument-hint: "<issue-id-or-url> [--repo <repo-key>]"
+---
 
-    read -p "  Issue source — linear or github [linear]: " SOURCE
-    SOURCE="${SOURCE:-linear}"
+# QA Scan
 
-    PROJECT_KEY=""
-    GITHUB_REPO=""
-    if [ "${SOURCE}" = "linear" ]; then
-      read -p "  Linear project key (e.g., SKIN): " PROJECT_KEY
-    else
-      read -p "  GitHub repo (e.g., org/repo): " GITHUB_REPO
-    fi
+Automated QA workflow with adversarial verification.
 
-    read -p "  Git branch to test [dev]: " BRANCH
-    BRANCH="${BRANCH:-dev}"
+Load: `.agents/qa-scan/workflow.md`
 
-    read -p "  Dev start command [npm run dev]: " DEV_CMD
-    DEV_CMD="${DEV_CMD:-npm run dev}"
+## Quick Reference
+- Config: `.agents/qa-scan/config/qa.config.yaml`
+- Prompts: `.agents/qa-scan/references/`
+- Evidence: `.agents/qa-scan/evidence/`
+- Setup: `bash .agents/qa-scan/scripts/install.sh`
+- Verify: `bash .agents/qa-scan/scripts/verify.sh`
+CLAUDE_ADAPTER
 
-    cat > config/qa.config.yaml << CONFIGEOF
-defaults:
-  video: true
-  trace: true
-  screenshots: true
-  evidence_dir: ./evidence
-  selectors: accessibility-first
-  self_healing_retries: 1
+# Gemini CLI adapter
+mkdir -p "$WORKSPACE/.gemini"
+cat > "$WORKSPACE/.gemini/qa-scan.md" << 'GEMINI_ADAPTER'
+# QA Scan Tool (Gemini CLI)
 
-repos:
-  my-project:
-    path: ${PROJECT_PATH}
-    base_url: ${BASE_URL}
-    dev_command: ${DEV_CMD}
-    source: ${SOURCE}
-    ${PROJECT_KEY:+project_key: ${PROJECT_KEY}}
-    ${GITHUB_REPO:+repo: ${GITHUB_REPO}}
-    branch: ${BRANCH}
-    gitnexus: false
-    auth:
-      strategy: skip
+Automated QA workflow: analyze issue → scout code → generate E2E test → run Playwright → adversarial verification → VERDICT report.
 
-labels:
-  pass: "qa-auto-passed"
-  fail: "qa-auto-failed"
-  partial: "qa-needs-manual"
+## Configuration
+- Workflow: `.agents/qa-scan/workflow.md`
+- Prompts: `.agents/qa-scan/references/`
+- Config: `.agents/qa-scan/config/qa.config.yaml`
+- Evidence: `.agents/qa-scan/evidence/`
 
-auto_post:
-  enabled: true
-  format: summary
-CONFIGEOF
-    echo ""
-    echo "  ✓ Config generated"
-  else
-    echo "→ Copying config template..."
-    cp config/qa.config.example.yaml config/qa.config.yaml
-    echo "  ⚠ Edit config/qa.config.yaml with your project settings"
-  fi
-  echo ""
-fi
+## Usage
+```
+qa-scan <issue-id-or-url> [--repo <repo-key>]
+```
 
-# ──────────────────────────────────
-# 3b. Linear MCP setup (optional)
-# ──────────────────────────────────
-if [ "${INTERACTIVE}" = true ]; then
-  echo "╔══════════════════════════════════╗"
-  echo "║    Linear Integration (optional) ║"
-  echo "╚══════════════════════════════════╝"
-  echo ""
-  echo "  1) API Key (simple — paste key from Linear Settings → API)"
-  echo "  2) OAuth  (multi-user — opens browser for authorization)"
-  echo "  3) Skip   (use gh CLI fallback — no Linear MCP)"
-  echo ""
-  read -p "  Choose [1/2/3, default=3]: " LINEAR_CHOICE
-  LINEAR_CHOICE="${LINEAR_CHOICE:-3}"
+Follow the 8-step pipeline defined in workflow.md.
+GEMINI_ADAPTER
 
-  case "${LINEAR_CHOICE}" in
-    1)
-      read -p "  Linear API Key (lin_api_...): " LINEAR_KEY
-      if [ -n "${LINEAR_KEY}" ]; then
-        # Inject Linear MCP config into AI agent settings
-        echo "  → Saving Linear MCP config..."
-        mkdir -p "${INSTALL_DIR}/.linear"
-        cat > "${INSTALL_DIR}/.linear/mcp-config.json" << LINEAREOF
-{
-  "linear": {
-    "command": "npx",
-    "args": ["-y", "@linear/mcp-server"],
-    "env": {
-      "LINEAR_API_KEY": "${LINEAR_KEY}"
-    }
-  }
-}
-LINEAREOF
-        echo "  ✓ Linear MCP config saved"
-        echo "  ℹ Add this to your AI agent's MCP settings:"
-        echo "    File: ${INSTALL_DIR}/.linear/mcp-config.json"
-      fi
-      ;;
-    2)
-      echo "  → OAuth setup requires browser authorization."
-      echo "  ℹ Register OAuth app at: https://linear.app/settings/api/applications"
-      echo "  ℹ Set redirect URI: http://localhost:3457/callback"
-      echo ""
-      read -p "  OAuth Client ID: " OAUTH_CLIENT_ID
-      read -p "  OAuth Client Secret: " OAUTH_CLIENT_SECRET
-      if [ -n "${OAUTH_CLIENT_ID}" ] && [ -n "${OAUTH_CLIENT_SECRET}" ]; then
-        mkdir -p "${INSTALL_DIR}/.linear"
-        cat > "${INSTALL_DIR}/.linear/oauth-config.json" << OAUTHEOF
-{
-  "client_id": "${OAUTH_CLIENT_ID}",
-  "client_secret": "${OAUTH_CLIENT_SECRET}",
-  "redirect_uri": "http://localhost:3457/callback"
-}
-OAUTHEOF
-        echo "  ✓ OAuth config saved"
-        echo "  ℹ Run 'bash scripts/linear-oauth.sh' to complete authorization"
-      fi
-      ;;
-    3)
-      echo "  → Skipping Linear MCP (will use gh CLI fallback)"
-      ;;
-  esac
-  echo ""
-fi
+# Antigravity adapter
+mkdir -p "$WORKSPACE/.antigravity"
+cat > "$WORKSPACE/.antigravity/qa-scan.md" << 'ANTIGRAVITY_ADAPTER'
+# QA Scan Command (Antigravity)
 
-# ──────────────────────────────────
-# 4. Detect AI agents → install adapters
-# ──────────────────────────────────
-echo "→ Detecting AI agents..."
-ABS_PROJECT="$(cd "${PROJECT_DIR}" && pwd)"
+Automated QA workflow: analyze issue → scout code → generate E2E test → run Playwright → adversarial verification → VERDICT report.
 
-AGENTS_INSTALLED=0
+## Configuration
+- Workflow: `.agents/qa-scan/workflow.md`
+- Prompts: `.agents/qa-scan/references/`
+- Config: `.agents/qa-scan/config/qa.config.yaml`
+- Evidence: `.agents/qa-scan/evidence/`
 
-# Claude Code
-if [ -d "${ABS_PROJECT}/.claude" ]; then
-  echo "  ✓ Claude Code detected"
-  mkdir -p "${ABS_PROJECT}/.claude/agents" "${ABS_PROJECT}/.claude/skills/qa-scan"
-  for f in agents/qa-*.md; do
-    [ -f "$f" ] && cp "$f" "${ABS_PROJECT}/.claude/agents/"
-  done
-  cp adapters/claude-skill.md "${ABS_PROJECT}/.claude/skills/qa-scan/SKILL.md"
-  AGENTS_INSTALLED=$((AGENTS_INSTALLED + 1))
-  echo "    → 7 agents + skill installed"
-fi
+## Usage
+```
+/qa-scan <issue-id-or-url> [--repo <repo-key>]
+```
 
-# Gemini CLI — native agent format (translate YAML fields)
-if [ -d "${ABS_PROJECT}/.gemini" ]; then
-  echo "  ✓ Gemini CLI detected"
-  cp adapters/gemini-adapter.md "${ABS_PROJECT}/.gemini/qa-scan.md"
-  mkdir -p "${ABS_PROJECT}/.gemini/agents"
-  for f in agents/qa-*.md; do
-    [ -f "$f" ] && sed \
-      -e 's/^model: haiku$/model: inherit/' \
-      -e 's/^model: sonnet$/model: inherit/' \
-      -e 's/^model: opus$/model: inherit/' \
-      -e 's/^maxTurns:/max_turns:/' \
-      -e '/^background:/d' \
-      -e '/^memory:/d' \
-      "$f" > "${ABS_PROJECT}/.gemini/agents/$(basename "$f")"
-  done
-  AGENTS_INSTALLED=$((AGENTS_INSTALLED + 1))
-  echo "    → 7 agents (native format) + adapter installed"
-fi
+Follow the 8-step pipeline defined in workflow.md.
+ANTIGRAVITY_ADAPTER
 
-# Antigravity
-if [ -d "${ABS_PROJECT}/.antigravity" ]; then
-  echo "  ✓ Antigravity detected"
-  cp adapters/antigravity-adapter.md "${ABS_PROJECT}/.antigravity/qa-scan.md"
-  # Create agent prompt files (strip YAML frontmatter, keep content)
-  mkdir -p "${ABS_PROJECT}/.antigravity/agents"
-  for f in agents/qa-*.md; do
-    [ -f "$f" ] && sed '1,/^---$/{ /^---$/,/^---$/d; }' "$f" > "${ABS_PROJECT}/.antigravity/agents/$(basename "$f")"
-  done
-  AGENTS_INSTALLED=$((AGENTS_INSTALLED + 1))
-  echo "    → 7 agent prompts + adapter installed"
-fi
-
-if [ $AGENTS_INSTALLED -eq 0 ]; then
-  echo "  ⚠ No AI agent config found in ${ABS_PROJECT}"
-  echo "    Create .claude/ or .gemini/ dir, then re-run install.sh"
-fi
-echo ""
-
-# ──────────────────────────────────
-# 5. Verify
-# ──────────────────────────────────
-bash scripts/verify.sh
+# 5. Copy agent definitions for portability (other AI agents)
+echo "→ Copying agent definitions for portability..."
+mkdir -p "$AGENTS_DIR/agents"
+for agent_file in "$WORKSPACE/.claude/agents"/qa-*.md; do
+  [ -f "$agent_file" ] && cp "$agent_file" "$AGENTS_DIR/agents/"
+done
+echo "  Agents copied to .agents/qa-scan/agents/"
 
 echo ""
-echo "╔══════════════════════════════════╗"
-echo "║    ✓ QA Scan Ready!              ║"
-echo "╚══════════════════════════════════╝"
-echo ""
-echo "  Installed at: ${INSTALL_DIR}"
-echo ""
-echo "  Usage:"
-echo "    /qa-scan SKIN-101              # Test single issue"
-echo "    /qa-scan --all                 # Test all QA issues"
-echo "    bash ${INSTALL_DIR}/scripts/qa-orchestrator.sh --watch 600"
-echo ""
+echo "✓ QA Scan installed successfully."
+echo "  Adapters created: Claude, Gemini, Antigravity"
+echo "  Agent definitions copied to .agents/qa-scan/agents/"
+echo "  Run: bash .agents/qa-scan/scripts/verify.sh"

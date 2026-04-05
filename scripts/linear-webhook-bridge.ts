@@ -15,7 +15,7 @@
  *   npx cloudflared tunnel --url http://localhost:3456
  */
 import { Hono } from 'hono';
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { exec } from 'node:child_process';
 
 const app = new Hono();
@@ -30,7 +30,11 @@ function verifySignature(rawBody: string, signature: string | undefined): boolea
   if (!secret || !signature) return false;
   const hmac = createHmac('sha256', secret);
   const digest = hmac.update(rawBody).digest('hex');
-  return signature === digest;
+  try {
+    return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(digest, 'hex'));
+  } catch {
+    return false;
+  }
 }
 
 /** Check if payload is a QA status transition */
@@ -66,7 +70,12 @@ app.post('/webhook/linear', async (c) => {
     return c.json({ error: 'Invalid signature' }, 401);
   }
 
-  const payload = JSON.parse(rawBody);
+  let payload: any;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return c.json({ error: 'Invalid JSON body' }, 400);
+  }
 
   // Only process QA transitions
   if (!isQATransition(payload)) {

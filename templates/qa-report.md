@@ -9,22 +9,24 @@
 | Scenario | Status | Duration |
 |----------|--------|----------|
 
-## Adversarial Verification
+## Coverage Analysis
 
-### Check: [description of what was verified]
+**Coverage:** {X}/{Y} states/actions tested = {Z}%
+
+| State/Action | Source | Tested | Verified | Result |
+|-------------|--------|--------|----------|--------|
+
+### Gaps (untested states)
+
+### Independent Verification Checks
+
+### Check: [state/action name]
 **Command run:**
   [exact command executed]
 **Output observed:**
   [actual terminal output — copy-paste, not paraphrased]
 **Expected vs Actual:** [comparison]
-**Result:** PASS/FAIL
-
-### Check: [adversarial probe description]
-**Command run:**
-  [exact command]
-**Output observed:**
-  [output]
-**Result:** PASS/FAIL
+**Result:** COVERED/GAP
 
 ## Evidence
 - Video: `evidence/{issue-id}/video.webm`

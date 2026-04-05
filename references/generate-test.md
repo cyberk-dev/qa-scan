@@ -11,7 +11,38 @@ You are generating a Playwright E2E test for a specific QA scenario.
 
 ## Output
 
-A complete, runnable Playwright test file.
+A complete, runnable Playwright test file covering ALL states from the test matrix.
+
+## Test Matrix Input (from flow-analyzer)
+
+If provided with a `test_matrix` JSON, generate tests for EVERY state and action:
+
+```typescript
+test.describe('{issue_id}: {feature_area}', () => {
+  // States from matrix — one test per state
+  test.describe('States', () => {
+    test('loading state shows skeleton', ...);
+    test('error state shows error message', ...);
+    test('empty state shows no-results', ...);
+    test('success state renders data', ...);
+  });
+
+  // Actions from matrix — one test per action
+  test.describe('Actions', () => {
+    test('submit button triggers mutation', ...);
+    test('navigation link routes correctly', ...);
+  });
+
+  // Issue-specific scenarios (from test_scenarios)
+  test.describe('Issue scenarios', () => {
+    test('{scenario_name}', ...);
+  });
+});
+```
+
+**Priority order:** error > auth > empty > loading > success > actions.
+**Mark origin:** add comment `// FROM: matrix` or `// FROM: issue` to each test for traceability.
+**Skip non-testable:** states marked "visual-only" (e.g., loading spinners) can use simple visibility checks.
 
 ## Selector Rules (MANDATORY — Accessibility-First)
 
@@ -63,6 +94,29 @@ test.describe('{issue_id}: {feature_area}', () => {
   });
 });
 ```
+
+## Hotspot Priority
+
+Before generating tests, check `.agents/qa-scan/evidence/hotspot-memory.json` for files with `bug_count >= 2`.
+
+For hotspot files: generate MORE thorough tests — extra assertions, edge cases, boundary values.
+Add a comment at the top of the test: `// HOTSPOT: {file} has {N} prior bugs — testing with extra scrutiny`
+
+Example hotspot-memory.json entry:
+```json
+{
+  "file": "src/features/product/ingredient-list.tsx",
+  "issue_id": "SKIN-101",
+  "fail_reason": "Ingredient list empty on slow connection",
+  "date": "2026-04-05",
+  "bug_count": 3
+}
+```
+
+If the feature under test touches a hotspot file, include:
+- Standard happy-path test
+- At least 1 boundary value test (empty data, large data)
+- At least 1 error state test (API failure, missing data)
 
 ## Rules
 

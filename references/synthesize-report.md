@@ -1,23 +1,15 @@
 # Synthesize QA Report
 
-You are synthesizing a final QA report from test execution and adversarial verification results.
+You are synthesizing a final QA report from test execution and coverage verification results.
 
 ## Input
 
 - **issue_id**: The issue being tested
 - **issue_title**: Brief description
-- **test_results**: Pass/fail status from Playwright execution (Step 5)
-- **verification_results**: Structured checks from adversarial verifier (Step 6)
+- **test_results**: Pass/fail status from Playwright execution (Step 4)
+- **coverage_results**: Coverage report from coverage-verifier (Step 5) — includes coverage %, gaps list, independent verification checks
+- **test_matrix**: Test matrix from flow-analyzer (Step 2b) — states[], actions[], coverage_summary
 - **evidence_paths**: Paths to video, trace, screenshots
-
-## Output Language
-
-Check `report_language` in qa.config.yaml:
-- `vi` → Write report in **Vietnamese** (tiếng Việt). Section headings, descriptions, analysis in Vietnamese.
-- `en` → Write report in English.
-- Default: `vi`
-
-**IMPORTANT:** The `VERDICT:` line MUST always be in English (`VERDICT: PASS/FAIL/PARTIAL`) — it is parsed programmatically.
 
 ## Output
 
@@ -37,17 +29,27 @@ A structured markdown report saved to `evidence/{issue-id}/report.md`.
 |----------|--------|----------|
 | {scenario_name} | PASS/FAIL | {Xs} |
 
-## Adversarial Verification
+## Coverage Analysis
 
-{Copy all structured checks from Step 6 verbatim}
+**Coverage:** {X}/{Y} states/actions tested = {Z}%
 
-### Check: {what was verified}
+| State/Action | Source | Tested | Verified | Result |
+|-------------|--------|--------|----------|--------|
+| {name} | matrix/issue | ✓/✗ | ✓/✗/- | COVERED/GAP |
+
+### Gaps (untested states)
+{List uncovered states/actions from coverage-verifier}
+
+### Independent Verification Checks
+{Copy structured checks from coverage-verifier verbatim}
+
+### Check: {state name}
 **Command run:**
   {exact command}
 **Output observed:**
   {terminal output}
 **Expected vs Actual:** {comparison}
-**Result:** PASS/FAIL
+**Result:** COVERED/GAP
 
 ## Evidence
 - Video: `evidence/{issue-id}/video.webm`
@@ -81,8 +83,8 @@ Vision results contribute to the overall VERDICT:
 
 ## Verdict Rules
 
-- **VERDICT: PASS** — All generated tests pass AND all adversarial checks pass. No ambiguity.
-- **VERDICT: FAIL** — Any test or adversarial check fails. Include:
+- **VERDICT: PASS** — All generated tests pass AND coverage ≥ 80% with critical states verified. No ambiguity.
+- **VERDICT: FAIL** — Any test fails OR coverage < 50% OR critical states (error, auth) unverified. Include:
   - Which check failed
   - Reproduction steps
   - Expected vs actual behavior
