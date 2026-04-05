@@ -1,0 +1,10 @@
+node_modules/
+evidence/*/
+evidence/results/
+evidence/html-report/
+evidence/results.json
+config/qa.config.yaml
+auth-state*.json
+bun.lock
+*.log
+.DS_Store

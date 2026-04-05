@@ -1,0 +1,43 @@
+# QA Scan Configuration — COPY AND EDIT THIS FILE
+# cp config/qa.config.example.yaml config/qa.config.yaml
+
+defaults:
+  video: true
+  trace: true
+  screenshots: true
+  evidence_dir: ./evidence
+  selectors: accessibility-first    # getByRole > getByLabel > getByText > getByTestId
+  self_healing_retries: 1
+
+repos:
+  # Rename 'my-project' to your project name
+  my-project:
+    path: /path/to/your/project       # <-- EDIT: absolute path to repo
+    base_url: http://localhost:3000    # <-- EDIT: dev server URL
+    dev_command: npm run dev           # <-- EDIT: start command
+    source: linear                     # linear or github
+    project_key: PROJ                  # <-- EDIT: Linear project key
+    # repo: org/repo                   # <-- EDIT: GitHub repo (if source=github)
+    branch: dev                        # <-- EDIT: branch to test
+    gitnexus: false                    # Set true if GitNexus MCP indexed
+    auth:
+      strategy: skip                   # skip or storage-state
+      # state_file: ./auth-state.json
+      # login_url: /login
+      # credentials_env:
+      #   email: QA_AUTH_EMAIL
+      #   password: QA_AUTH_PASSWORD
+
+labels:
+  pass: "qa-auto-passed"
+  fail: "qa-auto-failed"
+  partial: "qa-needs-manual"
+
+auto_post:
+  enabled: true
+  format: summary
+
+orchestrator:
+  poll_interval: 600
+  delay_between_issues: 30
+  max_issues_per_run: 10
