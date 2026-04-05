@@ -172,6 +172,9 @@ if [ "$NON_INTERACTIVE" = false ]; then
           ;;
         2)
           LINEAR_AUTH_METHOD="oauth"
+          echo "" > /dev/tty
+          echo "  OAuth will authenticate when you first use /qa-scan." > /dev/tty
+          echo "  The Linear MCP server will open your browser automatically." > /dev/tty
           ;;
       esac
       ;;
