@@ -304,11 +304,11 @@ configure_mcp() {
     # Merge into existing config
     jq --arg key "$mcp_key" --argjson val "$mcp_value" \
       'if .mcpServers then .mcpServers[$key] = $val else . + {mcpServers: {($key): $val}} end' \
-      "$config_file" > "$tmp_file" 2>/dev/null && mv "$tmp_file" "$config_file"
+      "$config_file" > "$tmp_file" 2>/dev/null && cp "$tmp_file" "$config_file" && rm -f "$tmp_file"
   else
-    # Create new — write to /tmp first, then move
+    # Create new — write to /tmp first, then copy
     jq -n --arg key "$mcp_key" --argjson val "$mcp_value" \
-      '{mcpServers: {($key): $val}}' > "$tmp_file" 2>/dev/null && mv "$tmp_file" "$config_file"
+      '{mcpServers: {($key): $val}}' > "$tmp_file" 2>/dev/null && cp "$tmp_file" "$config_file" && rm -f "$tmp_file"
   fi
 }
 
@@ -407,10 +407,10 @@ echo ""
 REPO_KEY="${REPO_KEY:-project}"
 
 if [ "$HAS_CLAUDE" = true ]; then
-  echo "  Claude Code:  /qa-scan ${REPO_KEY^^}-001"
+  echo "  Claude Code:  /qa-scan $(echo "$REPO_KEY" | tr '[:lower:]' '[:upper:]')-001"
 fi
 if [ "$HAS_GEMINI" = true ]; then
-  echo "  Gemini CLI:   @qa-orchestrator scan ${REPO_KEY^^}-001"
+  echo "  Gemini CLI:   @qa-orchestrator scan $(echo "$REPO_KEY" | tr '[:lower:]' '[:upper:]')-001"
 fi
 echo "  Any agent:    Follow .agents/qa-scan/workflow.md"
 echo ""
