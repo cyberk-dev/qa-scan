@@ -47,26 +47,13 @@ Load: `.agents/qa-scan/workflow.md`
 - Verify: `bash .agents/qa-scan/scripts/verify.sh`
 CLAUDE_ADAPTER
 
-# Gemini CLI adapter
-mkdir -p "$WORKSPACE/.gemini"
-cat > "$WORKSPACE/.gemini/qa-scan.md" << 'GEMINI_ADAPTER'
-# QA Scan Tool (Gemini CLI)
-
-Automated QA workflow: analyze issue → scout code → generate E2E test → run Playwright → adversarial verification → VERDICT report.
-
-## Configuration
-- Workflow: `.agents/qa-scan/workflow.md`
-- Prompts: `.agents/qa-scan/references/`
-- Config: `.agents/qa-scan/config/qa.config.yaml`
-- Evidence: `.agents/qa-scan/evidence/`
-
-## Usage
-```
-qa-scan <issue-id-or-url> [--repo <repo-key>]
-```
-
-Follow the 8-step pipeline defined in workflow.md.
-GEMINI_ADAPTER
+# Gemini CLI — install agents natively
+echo "→ Installing Gemini agents..."
+mkdir -p "$WORKSPACE/.gemini/agents"
+for agent_file in agents/qa-*.md; do
+  [ -f "$agent_file" ] && cp "$agent_file" "$WORKSPACE/.gemini/agents/"
+done
+echo "  Agents installed to .gemini/agents/"
 
 # Antigravity adapter
 mkdir -p "$WORKSPACE/.antigravity"
@@ -89,16 +76,17 @@ Automated QA workflow: analyze issue → scout code → generate E2E test → ru
 Follow the 8-step pipeline defined in workflow.md.
 ANTIGRAVITY_ADAPTER
 
-# 5. Copy agent definitions for portability (other AI agents)
-echo "→ Copying agent definitions for portability..."
-mkdir -p "$AGENTS_DIR/agents"
-for agent_file in "$WORKSPACE/.claude/agents"/qa-*.md; do
-  [ -f "$agent_file" ] && cp "$agent_file" "$AGENTS_DIR/agents/"
+# 5. Install Claude Code agents
+echo "→ Installing Claude agents..."
+mkdir -p "$WORKSPACE/.claude/agents"
+for agent_file in agents/qa-*.md; do
+  [ -f "$agent_file" ] && cp "$agent_file" "$WORKSPACE/.claude/agents/"
 done
-echo "  Agents copied to .agents/qa-scan/agents/"
+echo "  Agents installed to .claude/agents/"
 
 echo ""
 echo "✓ QA Scan installed successfully."
-echo "  Adapters created: Claude, Gemini, Antigravity"
-echo "  Agent definitions copied to .agents/qa-scan/agents/"
+echo "  Claude agents: .claude/agents/qa-*.md"
+echo "  Gemini agents: .gemini/agents/qa-*.md"
+echo "  Antigravity:   .antigravity/qa-scan.md (workflow.md fallback)"
 echo "  Run: bash .agents/qa-scan/scripts/verify.sh"

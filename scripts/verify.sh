@@ -33,14 +33,20 @@ done
 echo ""
 echo "--- Adapters ---"
 [ -f "$WORKSPACE/.claude/skills/qa-scan/SKILL.md" ] && echo "✓ Claude adapter" || { echo "⚠ Claude adapter missing"; WARNINGS=$((WARNINGS+1)); }
-[ -f "$WORKSPACE/.gemini/qa-scan.md" ] && echo "✓ Gemini adapter" || { echo "⚠ Gemini adapter missing"; WARNINGS=$((WARNINGS+1)); }
 [ -f "$WORKSPACE/.antigravity/qa-scan.md" ] && echo "✓ Antigravity adapter" || { echo "⚠ Antigravity adapter missing"; WARNINGS=$((WARNINGS+1)); }
 
-# Agent definitions
+# Claude agents
 echo ""
-echo "--- Agents ---"
+echo "--- Claude Agents ---"
 for agent in qa-orchestrator qa-issue-analyzer qa-code-scout qa-flow-analyzer qa-test-generator qa-test-runner qa-adversarial-verifier qa-coverage-verifier qa-report-synthesizer; do
-  [ -f "$WORKSPACE/.claude/agents/$agent.md" ] && echo "✓ $agent" || { echo "Warning: $agent missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
+  [ -f "$WORKSPACE/.claude/agents/$agent.md" ] && echo "✓ $agent" || { echo "⚠ $agent missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
+done
+
+# Gemini agents
+echo ""
+echo "--- Gemini Agents ---"
+for agent in qa-orchestrator qa-issue-analyzer qa-code-scout qa-flow-analyzer qa-test-generator qa-test-runner qa-adversarial-verifier qa-coverage-verifier qa-report-synthesizer; do
+  [ -f "$WORKSPACE/.gemini/agents/$agent.md" ] && echo "✓ $agent (gemini)" || { echo "⚠ $agent missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
 done
 
 # Orchestrator script

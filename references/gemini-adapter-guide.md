@@ -1,38 +1,61 @@
-# Porting QA Scan to Gemini CLI
+# Gemini CLI — Native Agent Support
 
-Guide for using the QA Scan workflow with Gemini CLI (or other non-Claude agents).
+QA Scan agents work natively on Gemini CLI. Same YAML frontmatter, same tool restrictions, same pipeline.
 
-## Overview
-
-QA Scan is agent-agnostic. All prompts and config live in `.agents/qa-scan/`.
-The Gemini adapter at `.gemini/qa-scan.md` points to the same workflow.
-
-## Gemini CLI Invocation
+## Setup
 
 ```bash
-# From Gemini CLI, reference the workflow:
-gemini "Follow the workflow at .agents/qa-scan/workflow.md to QA scan issue SKIN-101"
+# install.sh copies agents to .gemini/agents/ automatically
+bash install.sh
 ```
 
-## Key Differences from Claude Code
+Agents installed to `.gemini/agents/qa-*.md`. Gemini CLI auto-discovers them.
 
-| Aspect | Claude Code | Gemini CLI |
-|--------|------------|------------|
-| Trigger | `/qa-scan SKIN-101` | Natural language + workflow path |
-| Linear MCP | Native MCP support | Use `gh` CLI or Linear API as fallback |
-| GitNexus MCP | Native MCP support | Use grep/glob fallback from scout-code.md |
-| Bash execution | Via Bash tool | Via code execution / shell |
-| Subagent for verification | Task(subagent_type="tester") | Inline or separate prompt |
+## Usage
 
-## Gemini-Specific Notes
+```bash
+# Auto-delegation (Gemini routes to orchestrator based on description)
+gemini "QA scan issue SKIN-101"
 
-1. **MCP Support:** Gemini CLI supports MCP. If configured, GitNexus and Linear MCP work the same.
-2. **No SKILL.md:** Gemini doesn't use SKILL.md. Reference `workflow.md` directly.
-3. **Prompts:** All prompts in `references/` are agent-agnostic markdown. Load them the same way.
-4. **Playwright:** Runs via bash/shell execution. Same commands, same config.
+# Forced delegation (@ syntax)
+@qa-orchestrator scan SKIN-101 --repo skin-agent-fe
+```
 
-## Minimal Gemini Setup
+## How It Works
 
-1. Run: `bash .agents/qa-scan/scripts/install.sh`
-2. Ensure `.gemini/qa-scan.md` exists (created by install.sh)
-3. In Gemini: reference `.agents/qa-scan/workflow.md` when asked to do QA
+Gemini reads agent `.md` files from `.gemini/agents/`. Each agent has:
+- `name:` — exposed as a tool name
+- `description:` — Gemini uses this to auto-delegate
+- `tools:` — allowlist enforced (same as Claude Code)
+
+When `qa-orchestrator` is invoked, it spawns sub-agents as tools:
+```
+qa-orchestrator → qa-issue-analyzer → qa-code-scout → qa-flow-analyzer → ...
+```
+
+## Differences from Claude Code
+
+| Feature | Claude Code | Gemini CLI |
+|---------|-----------|------------|
+| Agent path | `.claude/agents/` | `.gemini/agents/` |
+| Spawn mechanism | `Agent` tool with `subagent_type` | Auto-delegation or `@agent` |
+| `model:` field | Respected (haiku/sonnet) | Ignored (uses Gemini model) |
+| Tool wildcards | Not supported | Supported (`*`, `mcp_*`) |
+| Subagent recursion | Configurable | Blocked (1 level only) |
+| MCP per-agent | Session-level | `mcpServers:` in frontmatter |
+| `background:` | Supported | May not be supported |
+| `timeout:` | Supported | May not be supported |
+
+## Compatibility Notes
+
+- **Recursion limit:** Gemini subagents cannot spawn other subagents. Our pipeline is compatible — orchestrator is the only spawner, all sub-agents are leaf nodes.
+- **`model:` field:** Gemini ignores `model: haiku`/`model: sonnet`. Uses its own default model for all agents.
+- **`background:`/`timeout:`:** These Claude Code frontmatter fields may be ignored by Gemini. Coverage-verifier will run foreground instead of background — slightly slower but functionally identical.
+- **MCP:** Gemini CLI supports MCP natively. If GitNexus/Linear MCP servers are configured, they work the same as Claude Code.
+
+## Fallback
+
+If agents don't work (older Gemini CLI version), use `workflow.md` directly:
+```bash
+gemini "Follow .agents/qa-scan/workflow.md to QA scan issue SKIN-101"
+```

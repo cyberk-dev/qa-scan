@@ -30,7 +30,7 @@ Spawns `qa-orchestrator` agent which coordinates 7 sub-agents in the main pipeli
 | 5 | qa-coverage-verifier | Read-only + background | Verify test coverage completeness |
 | 6 | qa-report-synthesizer | Write report only | VERDICT: PASS/FAIL/PARTIAL |
 
-> `qa-adversarial-verifier` is kept for backward compat (Gemini/Antigravity via workflow.md).
+> `qa-adversarial-verifier` kept as alternative verification mode.
 
 **Key improvement (v3):** Flow analyzer reads actual code to build a test coverage matrix (states, branches, actions). Test-generator creates tests for EVERY state, not just issue description. Coverage verifier checks completeness against the matrix.
 
@@ -41,5 +41,7 @@ Spawns `qa-orchestrator` agent which coordinates 7 sub-agents in the main pipeli
 - Setup: `bash .agents/qa-scan/scripts/install.sh`
 - Verify: `bash .agents/qa-scan/scripts/verify.sh`
 
-## For Non-Claude Agents
-Gemini/Antigravity: use `.agents/qa-scan/workflow.md` (prompt-based, no enforcement)
+## Multi-Agent Support
+- **Claude Code:** Native agents in `.claude/agents/qa-*.md`
+- **Gemini CLI:** Native agents in `.gemini/agents/qa-*.md` (same enforcement)
+- **Antigravity:** Uses `workflow.md` (prompt-based fallback)

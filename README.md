@@ -2,7 +2,7 @@
 
 Multi-agent QA pipeline with **enforced tool restrictions** and **coverage-driven testing**. Analyzes code to extract testable states, generates comprehensive Playwright tests, verifies coverage completeness.
 
-Works with: **Claude Code** | **Gemini CLI** | **Antigravity**
+Works with: **Claude Code** (native agents) | **Gemini CLI** (native agents) | **Antigravity** (workflow.md)
 
 ## Install
 
@@ -162,7 +162,7 @@ scripts/         Playwright config, auth, orchestrator, webhook bridge, verify
 config/          qa.config.example.yaml (template)
 templates/       Report template (coverage analysis format)
 evidence/        Test artifacts, tracker, memory files
-workflow.md      Universal pipeline (Gemini/Antigravity fallback)
+workflow.md      Universal pipeline reference (Antigravity fallback)
 adapters/        Pre-built agent adapters (Claude, Gemini, Antigravity)
 ```
 

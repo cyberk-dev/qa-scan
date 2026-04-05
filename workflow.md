@@ -1,5 +1,7 @@
 # QA Scan — Universal Workflow
 
+> **Claude Code / Gemini CLI:** Use native agents in `.claude/agents/` or `.gemini/agents/` (auto-installed by `install.sh`). This workflow.md serves as documentation reference and fallback for agents without native agent support (e.g., Antigravity).
+
 Automated QA pipeline: analyze issue → scout code → analyze flow → generate test → run → verify coverage → structured report.
 
 ## Usage
