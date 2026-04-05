@@ -10,6 +10,15 @@ You are synthesizing a final QA report from test execution and adversarial verif
 - **verification_results**: Structured checks from adversarial verifier (Step 6)
 - **evidence_paths**: Paths to video, trace, screenshots
 
+## Output Language
+
+Check `report_language` in qa.config.yaml:
+- `vi` → Write report in **Vietnamese** (tiếng Việt). Section headings, descriptions, analysis in Vietnamese.
+- `en` → Write report in English.
+- Default: `vi`
+
+**IMPORTANT:** The `VERDICT:` line MUST always be in English (`VERDICT: PASS/FAIL/PARTIAL`) — it is parsed programmatically.
+
 ## Output
 
 A structured markdown report saved to `evidence/{issue-id}/report.md`.

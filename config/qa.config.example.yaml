@@ -8,6 +8,7 @@ defaults:
   evidence_dir: ./evidence
   selectors: accessibility-first    # getByRole > getByLabel > getByText > getByTestId
   self_healing_retries: 1
+  report_language: vi              # vi = Vietnamese, en = English
 
 repos:
   # Rename 'my-project' to your project name
@@ -34,7 +35,7 @@ labels:
   partial: "qa-needs-manual"
 
 auto_post:
-  enabled: true
+  enabled: false                   # Set true to auto-post report to issue
   format: summary
 
 orchestrator:
