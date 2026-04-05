@@ -47,19 +47,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ── Detect if stdin is a pipe (curl | bash) → read from /dev/tty ──
-if [ ! -t 0 ]; then
-  # stdin is piped (curl | bash) — redirect reads from terminal
-  if [ -t 2 ] || [ -e /dev/tty ]; then
-    exec 3</dev/tty  # open fd 3 from terminal
-    TTY_FD=3
-  else
-    # No terminal available — fall back to non-interactive
-    NON_INTERACTIVE=true
-    TTY_FD=0
-  fi
-else
-  TTY_FD=0  # stdin is terminal, use normally
+# ── Detect if terminal is available for interactive prompts ──
+if [ ! -e /dev/tty ] && [ ! -t 0 ]; then
+  NON_INTERACTIVE=true
 fi
 
 # ── Utility functions ──
@@ -70,8 +60,8 @@ header() { echo -e "\n${CYAN}── $* ──${NC}"; }
 prompt_input() {
   local prompt="$1" default="$2" result
   if [ "$NON_INTERACTIVE" = true ]; then echo "$default"; return; fi
-  echo -n "  $prompt [$default]: " >&2
-  read result <&$TTY_FD
+  echo -n "  $prompt [$default]: " > /dev/tty
+  read result < /dev/tty
   echo "${result:-$default}"
 }
 
@@ -79,13 +69,13 @@ prompt_select() {
   local prompt="$1"; shift
   local options=("$@")
   if [ "$NON_INTERACTIVE" = true ]; then echo "1"; return; fi
-  echo "" >&2
+  echo "" > /dev/tty
   for i in "${!options[@]}"; do
-    echo "  [$((i+1))] ${options[$i]}" >&2
+    echo "  [$((i+1))] ${options[$i]}" > /dev/tty
   done
-  echo -n "  $prompt: " >&2
+  echo -n "  $prompt: " > /dev/tty
   local choice
-  read choice <&$TTY_FD
+  read choice < /dev/tty
   echo "${choice:-1}"
 }
 
@@ -174,7 +164,7 @@ if [ "$NON_INTERACTIVE" = false ]; then
       case "$AUTH_CHOICE" in
         1)
           LINEAR_AUTH_METHOD="api_key"
-          echo -n "  API Key: " >&2; read -s LINEAR_API_KEY <&$TTY_FD; echo "" >&2
+          echo -n "  API Key: " > /dev/tty; read -s LINEAR_API_KEY < /dev/tty; echo "" > /dev/tty
           ;;
         2)
           LINEAR_AUTH_METHOD="oauth"
@@ -196,7 +186,7 @@ if [ "$NON_INTERACTIVE" = false ]; then
   DEV_COMMAND=$(prompt_input "Dev command" "bun run dev")
   BRANCH=$(prompt_input "Main branch" "dev")
 
-  echo -n "  Use GitNexus for code analysis? [Y/n]: " >&2; read USE_GITNEXUS <&$TTY_FD
+  echo -n "  Use GitNexus for code analysis? [Y/n]: " > /dev/tty; read USE_GITNEXUS < /dev/tty
   USE_GITNEXUS="${USE_GITNEXUS:-Y}"
 fi
 
