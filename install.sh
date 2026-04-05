@@ -384,10 +384,26 @@ fi
 # Gemini CLI — convert frontmatter to Gemini format
 convert_agent_for_gemini() {
   local src="$1" dest="$2"
-  # 1. Remove Claude-specific keys (background, maxTurns, timeout)
-  # 2. Convert tools: "A, B, C" → YAML array format
+  # Convert Claude Code agent format → Gemini CLI format:
+  # - tools: comma string → YAML array
+  # - maxTurns → max_turns
+  # - timeout (seconds) → timeout_mins (minutes)
+  # - Remove background (not supported)
+  # - Remove model (Gemini uses its own)
   awk '
-    /^(background|maxTurns|timeout):/ { next }
+    /^background:/ { next }
+    /^model:/ { next }
+    /^maxTurns:/ {
+      val = $2
+      print "max_turns: " val
+      next
+    }
+    /^timeout:/ {
+      val = int($2 / 60)
+      if (val < 1) val = 1
+      print "timeout_mins: " val
+      next
+    }
     /^tools:/ {
       sub(/^tools: */, "")
       n = split($0, tools, /, */)
