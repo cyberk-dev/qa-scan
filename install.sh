@@ -57,26 +57,29 @@ info()  { echo -e "${GREEN}→${NC} $*"; }
 warn()  { echo -e "${YELLOW}⚠${NC} $*"; }
 header() { echo -e "\n${CYAN}── $* ──${NC}"; }
 
+# Use global PROMPT_RESULT to avoid $() subshell capturing display output
+PROMPT_RESULT=""
+
 prompt_input() {
-  local prompt="$1" default="$2" result
-  if [ "$NON_INTERACTIVE" = true ]; then echo "$default"; return; fi
+  local prompt="$1" default="$2"
+  if [ "$NON_INTERACTIVE" = true ]; then PROMPT_RESULT="$default"; return; fi
   echo -n "  $prompt [$default]: " > /dev/tty
-  read result < /dev/tty
-  echo "${result:-$default}"
+  read PROMPT_RESULT < /dev/tty
+  PROMPT_RESULT="${PROMPT_RESULT:-$default}"
 }
 
 prompt_select() {
   local prompt="$1"; shift
   local options=("$@")
-  if [ "$NON_INTERACTIVE" = true ]; then echo "1"; return; fi
+  if [ "$NON_INTERACTIVE" = true ]; then PROMPT_RESULT="1"; return; fi
   echo "" > /dev/tty
-  for i in "${!options[@]}"; do
+  local i
+  for i in $(seq 0 $((${#options[@]} - 1))); do
     echo "  [$((i+1))] ${options[$i]}" > /dev/tty
   done
   echo -n "  $prompt: " > /dev/tty
-  local choice
-  read choice < /dev/tty
-  echo "${choice:-1}"
+  read PROMPT_RESULT < /dev/tty
+  PROMPT_RESULT="${PROMPT_RESULT:-1}"
 }
 
 # ══════════════════════════════════════════════
@@ -151,17 +154,18 @@ fi
 # ══════════════════════════════════════════════
 if [ "$NON_INTERACTIVE" = false ]; then
   header "Issue Source"
-  SOURCE_CHOICE=$(prompt_select "Where are your issues? " "Linear" "GitHub Issues")
+  prompt_select "Where are your issues?" "Linear" "GitHub Issues"
 
-  case "$SOURCE_CHOICE" in
+  case "$PROMPT_RESULT" in
     1)
       SOURCE="linear"
-      PROJECT_KEY=$(prompt_input "Linear project key (e.g., SKIN)" "PROJ")
+      prompt_input "Linear project key (e.g., SKIN)" "PROJ"
+      PROJECT_KEY="$PROMPT_RESULT"
 
       header "Linear Authentication"
-      AUTH_CHOICE=$(prompt_select "Auth method? " "API Key (paste key)" "OAuth (opens browser)")
+      prompt_select "Auth method?" "API Key (paste key)" "OAuth (opens browser)"
 
-      case "$AUTH_CHOICE" in
+      case "$PROMPT_RESULT" in
         1)
           LINEAR_AUTH_METHOD="api_key"
           echo -n "  API Key: " > /dev/tty; read -s LINEAR_API_KEY < /dev/tty; echo "" > /dev/tty
@@ -173,7 +177,8 @@ if [ "$NON_INTERACTIVE" = false ]; then
       ;;
     2)
       SOURCE="github"
-      GH_REPO=$(prompt_input "GitHub repo (e.g., org/repo)" "$(basename "$WORKSPACE")")
+      prompt_input "GitHub repo (e.g., org/repo)" "$(basename "$WORKSPACE")"
+      GH_REPO="$PROMPT_RESULT"
       ;;
   esac
 
@@ -181,10 +186,14 @@ if [ "$NON_INTERACTIVE" = false ]; then
   # Step 4: Project Configuration
   # ══════════════════════════════════════════════
   header "Project Configuration"
-  REPO_KEY=$(prompt_input "Project name/key" "$(basename "$WORKSPACE")")
-  BASE_URL=$(prompt_input "Dev server URL" "http://localhost:3000")
-  DEV_COMMAND=$(prompt_input "Dev command" "bun run dev")
-  BRANCH=$(prompt_input "Main branch" "dev")
+  prompt_input "Project name/key" "$(basename "$WORKSPACE")"
+  REPO_KEY="$PROMPT_RESULT"
+  prompt_input "Dev server URL" "http://localhost:3000"
+  BASE_URL="$PROMPT_RESULT"
+  prompt_input "Dev command" "bun run dev"
+  DEV_COMMAND="$PROMPT_RESULT"
+  prompt_input "Main branch" "dev"
+  BRANCH="$PROMPT_RESULT"
 
   echo -n "  Use GitNexus for code analysis? [Y/n]: " > /dev/tty; read USE_GITNEXUS < /dev/tty
   USE_GITNEXUS="${USE_GITNEXUS:-Y}"
