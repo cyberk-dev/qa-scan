@@ -176,14 +176,26 @@ fi
 if [ -d "${ABS_PROJECT}/.gemini" ]; then
   echo "  ✓ Gemini CLI detected"
   cp adapters/gemini-adapter.md "${ABS_PROJECT}/.gemini/qa-scan.md"
+  # Create agent prompt files (strip YAML frontmatter, keep content)
+  mkdir -p "${ABS_PROJECT}/.gemini/agents"
+  for f in agents/qa-*.md; do
+    [ -f "$f" ] && sed '1,/^---$/{ /^---$/,/^---$/d; }' "$f" > "${ABS_PROJECT}/.gemini/agents/$(basename "$f")"
+  done
   AGENTS_INSTALLED=$((AGENTS_INSTALLED + 1))
+  echo "    → 7 agent prompts + adapter installed"
 fi
 
 # Antigravity
 if [ -d "${ABS_PROJECT}/.antigravity" ]; then
   echo "  ✓ Antigravity detected"
   cp adapters/antigravity-adapter.md "${ABS_PROJECT}/.antigravity/qa-scan.md"
+  # Create agent prompt files (strip YAML frontmatter, keep content)
+  mkdir -p "${ABS_PROJECT}/.antigravity/agents"
+  for f in agents/qa-*.md; do
+    [ -f "$f" ] && sed '1,/^---$/{ /^---$/,/^---$/d; }' "$f" > "${ABS_PROJECT}/.antigravity/agents/$(basename "$f")"
+  done
   AGENTS_INSTALLED=$((AGENTS_INSTALLED + 1))
+  echo "    → 7 agent prompts + adapter installed"
 fi
 
 if [ $AGENTS_INSTALLED -eq 0 ]; then
