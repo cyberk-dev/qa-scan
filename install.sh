@@ -406,9 +406,24 @@ convert_agent_for_gemini() {
     }
     /^tools:/ {
       sub(/^tools: */, "")
+      # If Agent tool present → orchestrator, give all tools
+      if (index($0, "Agent") > 0) {
+        print "tools:\n  - \"*\""
+        next
+      }
       n = split($0, tools, /, */)
       print "tools:"
-      for (i = 1; i <= n; i++) print "  - " tools[i]
+      for (i = 1; i <= n; i++) {
+        t = tools[i]
+        if (t == "Read") t = "read_file"
+        else if (t == "Write") t = "write_file"
+        else if (t == "Bash") t = "run_shell_command"
+        else if (t == "Grep") t = "grep_search"
+        else if (t == "Glob") t = "glob"
+        else if (t == "WebFetch") t = "web_fetch"
+        else if (t == "SendMessage") continue
+        print "  - " t
+      }
       next
     }
     { print }
