@@ -436,6 +436,8 @@ if [ "$HAS_GEMINI" = true ]; then
     [ -f "$f" ] || continue
     convert_agent_for_gemini "$f" "$WORKSPACE/.gemini/agents/$(basename "$f")"
   done
+  # Cleanup old command format (TOML → deprecated)
+  rm -rf "$WORKSPACE/.gemini/commands/qa" 2>/dev/null || true
   # Gemini prompt template: /scan
   mkdir -p "$WORKSPACE/.gemini/prompts"
   cp adapters/gemini-prompt/scan.md "$WORKSPACE/.gemini/prompts/scan.md" 2>/dev/null || true
