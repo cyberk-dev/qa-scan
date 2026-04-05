@@ -172,17 +172,23 @@ if [ -d "${ABS_PROJECT}/.claude" ]; then
   echo "    → 7 agents + skill installed"
 fi
 
-# Gemini CLI
+# Gemini CLI — native agent format (translate YAML fields)
 if [ -d "${ABS_PROJECT}/.gemini" ]; then
   echo "  ✓ Gemini CLI detected"
   cp adapters/gemini-adapter.md "${ABS_PROJECT}/.gemini/qa-scan.md"
-  # Create agent prompt files (strip YAML frontmatter, keep content)
   mkdir -p "${ABS_PROJECT}/.gemini/agents"
   for f in agents/qa-*.md; do
-    [ -f "$f" ] && sed '1,/^---$/{ /^---$/,/^---$/d; }' "$f" > "${ABS_PROJECT}/.gemini/agents/$(basename "$f")"
+    [ -f "$f" ] && sed \
+      -e 's/^model: haiku$/model: inherit/' \
+      -e 's/^model: sonnet$/model: inherit/' \
+      -e 's/^model: opus$/model: inherit/' \
+      -e 's/^maxTurns:/max_turns:/' \
+      -e '/^background:/d' \
+      -e '/^memory:/d' \
+      "$f" > "${ABS_PROJECT}/.gemini/agents/$(basename "$f")"
   done
   AGENTS_INSTALLED=$((AGENTS_INSTALLED + 1))
-  echo "    → 7 agent prompts + adapter installed"
+  echo "    → 7 agents (native format) + adapter installed"
 fi
 
 # Antigravity
