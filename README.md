@@ -1,6 +1,6 @@
 # QA Scan — Agentic QA Automation
 
-Multi-agent QA pipeline with enforced tool restrictions. Fetch issue, analyze, scout code, generate Playwright E2E test, run with video evidence, adversarial verification, VERDICT report.
+Multi-agent QA pipeline with **enforced tool restrictions** and **coverage-driven testing**. Analyzes code to extract testable states, generates comprehensive Playwright tests, verifies coverage completeness.
 
 Works with: **Claude Code** | **Gemini CLI** | **Antigravity**
 
@@ -60,34 +60,51 @@ The installer will:
 ```bash
 bash ~/.qa-scan/scripts/qa-orchestrator.sh --watch 600
 ```
-Polls Linear every 10 minutes. Auto-tests new QA issues. Posts results.
+Polls Linear every 10 minutes. Auto-tests new QA issues. Posts results + labels.
 
 ## How It Works
 
-### 8-Step Pipeline
+### Pipeline (v3)
 
-1. **Fetch issue** from Linear/GitHub
-2. **Analyze** description → test requirements
-3. **Scout code** → find relevant files
-4. **Generate test** → Playwright E2E
-5. **Run test** → execute + capture video/trace
-6. **Adversarial verification** → try to break it (read-only)
-7. **Synthesize report** → VERDICT: PASS/FAIL/PARTIAL
-8. **Post results** → comment + label on issue
+```
+Step 0: Project context + dev server health check
+Step 1: Fetch + analyze issue → test requirements
+Step 2: Scout code → find relevant files (GitNexus if available)
+Step 2b: Analyze flow → read code, extract states/branches → test matrix
+Step 3: Generate test → Playwright E2E from matrix + issue scenarios
+Step 4: Run test → execute + capture video/trace/screenshots
+Step 5: Coverage verification → compare tests vs flow matrix
+Step 6: Synthesize report → VERDICT: PASS/FAIL/PARTIAL
+Step 7: Post results → comment + label on Linear/GitHub
+Step 8: Update hotspot memory → track buggy files for future runs
+```
 
-### 7 Enforced Agents
+**Key v3 improvement:** Step 2b (flow analyzer) reads actual source code to extract every testable state (loading, error, empty, auth, success). Tests are generated for ALL states, not just what the issue description mentions. Coverage verifier checks completeness against the matrix.
+
+### 9 Enforced Agents
 
 Each agent has restricted tool access — cannot exceed its role:
 
-| Agent | Access | Role |
-|-------|--------|------|
-| orchestrator | Read + spawn | Coordinates pipeline |
-| issue-analyzer | Read-only | Extract test requirements |
-| code-scout | Read-only | Find relevant code |
-| test-generator | Write evidence/ only | Generate Playwright test |
-| test-runner | Bash only | Execute test + capture video |
-| adversarial-verifier | Read-only, background | Try to break the fix |
-| report-synthesizer | Write report only | VERDICT: PASS/FAIL/PARTIAL |
+| # | Agent | Access | Role |
+|---|-------|--------|------|
+| - | orchestrator | Read + spawn | Coordinates pipeline |
+| 1 | issue-analyzer | Read-only | Extract test requirements |
+| 2 | code-scout | Read-only | Find relevant code files |
+| 2b | flow-analyzer | Read-only | Analyze code → test coverage matrix |
+| 3 | test-generator | Write evidence/ only | Generate Playwright tests from matrix |
+| 4 | test-runner | Bash only | Execute test + capture video |
+| 5 | coverage-verifier | Read-only, background | Verify test coverage completeness |
+| 6 | report-synthesizer | Write report only | VERDICT: PASS/FAIL/PARTIAL |
+
+> `adversarial-verifier` kept as fallback for Gemini/Antigravity (via workflow.md).
+
+### Feedback Loops
+
+| Memory | Purpose |
+|--------|---------|
+| `evidence/hotspot-memory.json` | Tracks files with repeated bugs → extra-thorough tests |
+| `evidence/flaky-memory.json` | Tracks bad selectors → auto-avoid in test generation |
+| `evidence/qa-tracker.json` | Tracks scanned issues → prevents re-scanning |
 
 ### Post-QA Labels (auto-applied)
 
@@ -109,18 +126,42 @@ repos:
     source: linear             # or github
     project_key: PROJ          # Linear project key
     branch: dev
+    gitnexus: true             # Enable semantic code analysis
 ```
 
-See `config/qa.config.example.yaml` for all options.
+See `config/qa.config.example.yaml` for all options including auth, vision, labels, and orchestrator settings.
+
+## Auto-Run (Cron)
+
+### macOS (launchd)
+
+Create `~/Library/LaunchAgents/com.cyberk.qa-scan.plist` — runs every 10 min.
+
+### Linux (crontab)
+
+```bash
+crontab -e
+# Add (replace WORKSPACE_PATH):
+*/10 * * * * cd WORKSPACE_PATH && PATH="/usr/local/bin:$PATH" bash .agents/qa-scan/scripts/qa-orchestrator.sh >> /tmp/qa-scan-cron.log 2>&1
+```
+
+### Simple (any OS)
+
+```bash
+bash ~/.qa-scan/scripts/qa-orchestrator.sh --watch 600
+```
+
+See `workflow.md` → "Auto-Run" section for full launchd plist template.
 
 ## File Structure
 
 ```
-agents/          7 agent definitions (tool-restricted)
-references/      9 prompt templates
-scripts/         Playwright config, auth, orchestrator, webhook, verify
+agents/          9 agent definitions (tool-restricted, slim — details in references/)
+references/      10 prompt templates + verdict rules
+scripts/         Playwright config, auth, orchestrator, webhook bridge, verify
 config/          qa.config.example.yaml (template)
-templates/       Report template
+templates/       Report template (coverage analysis format)
+evidence/        Test artifacts, tracker, memory files
 workflow.md      Universal pipeline (Gemini/Antigravity fallback)
 adapters/        Pre-built agent adapters (Claude, Gemini, Antigravity)
 ```
