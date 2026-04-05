@@ -33,13 +33,15 @@ curl -fsSL https://...install.sh | bash -s -- --dir ~/qa-scan --project-dir /pat
 curl -fsSL https://...install.sh | bash -s -- --non-interactive
 ```
 
-The installer will:
-1. Auto-install Bun (if missing)
-2. Clone qa-scan repo
-3. Install Playwright + Chromium
-4. Ask you to configure your project (interactive wizard)
-5. Detect your AI agent and install adapters
-6. Run verification
+The interactive wizard will:
+1. Auto-install Bun + jq (if missing)
+2. Clone qa-scan repo to `.agents/qa-scan/`
+3. Ask: **Linear** or **GitHub Issues**? Configure auth (API key or OAuth)
+4. Configure your project (URL, dev command, branch)
+5. Auto-setup **MCP servers** (Linear + GitNexus → `.claude/mcp.json`)
+6. Install **Playwright + Chromium**
+7. Detect AI agents and install: Claude agents + Gemini agents + Antigravity adapter
+8. Print usage instructions
 
 ## Usage
 
