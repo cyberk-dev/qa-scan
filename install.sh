@@ -292,7 +292,9 @@ configure_mcp() {
     return
   fi
 
-  mkdir -p "$(dirname "$config_file")"
+  local config_dir
+  config_dir="$(dirname "$config_file")"
+  mkdir -p "$config_dir" 2>/dev/null || { warn "Cannot create $config_dir"; return; }
 
   if [ -f "$config_file" ] && [ -s "$config_file" ]; then
     # File exists and is non-empty — merge into existing config
@@ -303,6 +305,7 @@ configure_mcp() {
       "$config_file" > "$tmp_file" && mv "$tmp_file" "$config_file"
   else
     # File doesn't exist or is empty — create new
+    touch "$config_file"
     jq -n --arg key "$mcp_key" --argjson val "$mcp_value" \
       '{mcpServers: {($key): $val}}' > "$config_file"
   fi
