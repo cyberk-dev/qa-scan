@@ -286,28 +286,24 @@ configure_mcp() {
   local config_file="$1"
   local mcp_key="$2"
   local mcp_value="$3"
+  local tmp_file="/tmp/qa-scan-mcp-$$.json"
 
   if ! command -v jq &>/dev/null; then
     warn "jq not available — skip MCP config for $config_file"
     return
   fi
 
-  local config_dir
-  config_dir="$(dirname "$config_file")"
-  mkdir -p "$config_dir" 2>/dev/null || { warn "Cannot create $config_dir"; return; }
+  mkdir -p "$(dirname "$config_file")" 2>/dev/null || true
 
   if [ -f "$config_file" ] && [ -s "$config_file" ]; then
-    # File exists and is non-empty — merge into existing config
-    # Ensure mcpServers key exists before merging
-    local tmp_file="${config_file}.tmp"
+    # Merge into existing config
     jq --arg key "$mcp_key" --argjson val "$mcp_value" \
       'if .mcpServers then .mcpServers[$key] = $val else . + {mcpServers: {($key): $val}} end' \
-      "$config_file" > "$tmp_file" && mv "$tmp_file" "$config_file"
+      "$config_file" > "$tmp_file" 2>/dev/null && mv "$tmp_file" "$config_file"
   else
-    # File doesn't exist or is empty — create new
-    touch "$config_file"
+    # Create new — write to /tmp first, then move
     jq -n --arg key "$mcp_key" --argjson val "$mcp_value" \
-      '{mcpServers: {($key): $val}}' > "$config_file"
+      '{mcpServers: {($key): $val}}' > "$tmp_file" 2>/dev/null && mv "$tmp_file" "$config_file"
   fi
 }
 
