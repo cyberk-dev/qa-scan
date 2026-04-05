@@ -153,6 +153,71 @@ CONFIGEOF
 fi
 
 # ──────────────────────────────────
+# 3b. Linear MCP setup (optional)
+# ──────────────────────────────────
+if [ "${INTERACTIVE}" = true ]; then
+  echo "╔══════════════════════════════════╗"
+  echo "║    Linear Integration (optional) ║"
+  echo "╚══════════════════════════════════╝"
+  echo ""
+  echo "  1) API Key (simple — paste key from Linear Settings → API)"
+  echo "  2) OAuth  (multi-user — opens browser for authorization)"
+  echo "  3) Skip   (use gh CLI fallback — no Linear MCP)"
+  echo ""
+  read -p "  Choose [1/2/3, default=3]: " LINEAR_CHOICE
+  LINEAR_CHOICE="${LINEAR_CHOICE:-3}"
+
+  case "${LINEAR_CHOICE}" in
+    1)
+      read -p "  Linear API Key (lin_api_...): " LINEAR_KEY
+      if [ -n "${LINEAR_KEY}" ]; then
+        # Inject Linear MCP config into AI agent settings
+        echo "  → Saving Linear MCP config..."
+        mkdir -p "${INSTALL_DIR}/.linear"
+        cat > "${INSTALL_DIR}/.linear/mcp-config.json" << LINEAREOF
+{
+  "linear": {
+    "command": "npx",
+    "args": ["-y", "@linear/mcp-server"],
+    "env": {
+      "LINEAR_API_KEY": "${LINEAR_KEY}"
+    }
+  }
+}
+LINEAREOF
+        echo "  ✓ Linear MCP config saved"
+        echo "  ℹ Add this to your AI agent's MCP settings:"
+        echo "    File: ${INSTALL_DIR}/.linear/mcp-config.json"
+      fi
+      ;;
+    2)
+      echo "  → OAuth setup requires browser authorization."
+      echo "  ℹ Register OAuth app at: https://linear.app/settings/api/applications"
+      echo "  ℹ Set redirect URI: http://localhost:3457/callback"
+      echo ""
+      read -p "  OAuth Client ID: " OAUTH_CLIENT_ID
+      read -p "  OAuth Client Secret: " OAUTH_CLIENT_SECRET
+      if [ -n "${OAUTH_CLIENT_ID}" ] && [ -n "${OAUTH_CLIENT_SECRET}" ]; then
+        mkdir -p "${INSTALL_DIR}/.linear"
+        cat > "${INSTALL_DIR}/.linear/oauth-config.json" << OAUTHEOF
+{
+  "client_id": "${OAUTH_CLIENT_ID}",
+  "client_secret": "${OAUTH_CLIENT_SECRET}",
+  "redirect_uri": "http://localhost:3457/callback"
+}
+OAUTHEOF
+        echo "  ✓ OAuth config saved"
+        echo "  ℹ Run 'bash scripts/linear-oauth.sh' to complete authorization"
+      fi
+      ;;
+    3)
+      echo "  → Skipping Linear MCP (will use gh CLI fallback)"
+      ;;
+  esac
+  echo ""
+fi
+
+# ──────────────────────────────────
 # 4. Detect AI agents → install adapters
 # ──────────────────────────────────
 echo "→ Detecting AI agents..."

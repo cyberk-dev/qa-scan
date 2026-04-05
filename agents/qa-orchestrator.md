@@ -18,9 +18,16 @@ Spawn agent: `qa-issue-analyzer`
 Input: issue URL/ID + repo config
 Output: JSON with feature_area, test_scenarios, expected_behavior, confidence
 
+### Step 1b: GitNexus Incremental Re-analyze (if gitnexus: true)
+Before scouting, ensure GitNexus index is fresh:
+```bash
+gitnexus analyze --incremental {repo_path}
+```
+This takes ~10-30s (only scans changed files). Skip if `gitnexus: false` in config.
+
 ### Step 2: Scout Code
 Spawn agent: `qa-code-scout`
-Input: feature_area + repo path
+Input: feature_area + repo path + gitnexus flag
 Output: list of relevant files
 
 ### Step 3: Generate Test
