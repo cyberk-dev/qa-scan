@@ -1,0 +1,2 @@
+[command]
+prompt = "@qa-orchestrator Run QA scan pipeline for issue {}. Read config from .agents/qa-scan/config/qa.config.yaml. Follow the full pipeline: analyze issue → scout code → analyze flow → generate test → run → verify coverage → synthesize report."

@@ -58,8 +58,8 @@ curl -fsSL https://...install.sh | bash -s -- --project-dir /path/to/project
 
 ### Gemini CLI
 ```
-@qa-orchestrator scan SKIN-101       # Forced delegation
-gemini "QA scan issue SKIN-101"      # Auto-delegation
+/qa:scan SKIN-101                    # Slash command (recommended)
+@qa-orchestrator scan SKIN-101       # Direct agent delegation
 ```
 
 ### Zero-Touch (auto-poll)
@@ -190,7 +190,7 @@ config/          qa.config.example.yaml
 templates/       Report template
 evidence/        Test artifacts, tracker, memory files
 workflow.md      Pipeline reference (Antigravity fallback)
-adapters/        Claude, Gemini, Antigravity adapters
+adapters/        Claude skill, Gemini command+skill, Antigravity adapter
 test-app/        Dummy app for E2E testing
 uninstall.sh     Clean removal script
 ```
