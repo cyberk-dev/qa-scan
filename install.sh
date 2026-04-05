@@ -381,11 +381,31 @@ if [ "$HAS_CLAUDE" = true ]; then
   info "Claude agents installed"
 fi
 
-# Gemini CLI
+# Gemini CLI — convert frontmatter to Gemini format
+convert_agent_for_gemini() {
+  local src="$1" dest="$2"
+  # 1. Remove Claude-specific keys (background, maxTurns, timeout)
+  # 2. Convert tools: "A, B, C" → YAML array format
+  awk '
+    /^(background|maxTurns|timeout):/ { next }
+    /^tools:/ {
+      sub(/^tools: */, "")
+      n = split($0, tools, /, */)
+      print "tools:"
+      for (i = 1; i <= n; i++) print "  - " tools[i]
+      next
+    }
+    { print }
+  ' "$src" > "$dest"
+}
+
 if [ "$HAS_GEMINI" = true ]; then
   mkdir -p "$WORKSPACE/.gemini/agents"
-  for f in agents/qa-*.md; do [ -f "$f" ] && cp "$f" "$WORKSPACE/.gemini/agents/"; done
-  info "Gemini agents installed"
+  for f in agents/qa-*.md; do
+    [ -f "$f" ] || continue
+    convert_agent_for_gemini "$f" "$WORKSPACE/.gemini/agents/$(basename "$f")"
+  done
+  info "Gemini agents installed (converted format)"
 fi
 
 # Antigravity
