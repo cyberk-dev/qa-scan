@@ -1,0 +1,30 @@
+# QA Scan — Test Configuration
+# Uses dummy test-app at localhost:4000
+
+defaults:
+  video: true
+  trace: true
+  screenshots: true
+  evidence_dir: ./evidence
+  selectors: accessibility-first
+  self_healing_retries: 1
+
+repos:
+  test-app:
+    path: ./test-app
+    base_url: http://localhost:4000
+    dev_command: bun test-app/server.ts
+    source: mock
+    branch: main
+    gitnexus: false
+    auth:
+      strategy: skip
+
+labels:
+  pass: "qa-auto-passed"
+  fail: "qa-auto-failed"
+  partial: "qa-needs-manual"
+
+auto_post:
+  enabled: false
+  format: summary

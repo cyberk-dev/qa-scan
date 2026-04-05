@@ -1,0 +1,9 @@
+{
+  "id": "TEST-001",
+  "title": "Fix: Beneficial ingredients not displaying correctly on Product Detail page",
+  "description": "## Bug Report\n\nWhen viewing a product detail page, the beneficial ingredients list should show 3 items (Niacinamide, Hyaluronic Acid, Vitamin E) but sometimes shows empty.\n\n## Steps to Reproduce\n1. Navigate to product detail page (http://localhost:4000)\n2. Look at the 'Ingredients Analysis' section\n3. Verify that 'Beneficial ingredients' list shows 3 items\n\n## Expected Behavior\n- Beneficial ingredients list displays: Niacinamide, Hyaluronic Acid, Vitamin E\n- Each ingredient shows its effect\n- 'Analyze Product' button triggers AI analysis after ~1s\n- Status shows 'Analysis complete' after clicking\n\n## Actual Behavior\nList sometimes renders empty on slow connections.\n\n## Labels\n- bug\n- frontend\n- product-detail",
+  "labels": ["bug", "frontend"],
+  "status": "QA",
+  "assignee": "dev@cyberk.io",
+  "branch": "fix/ingredient-display"
+}
