@@ -13,6 +13,31 @@ Prompts: `.agents/qa-scan/references/` (agents load these themselves).
 
 ## Pipeline (execute in order)
 
+### Step 0: Project Context + Server Health
+
+**0a. Read project docs** (understand the codebase before testing):
+- Read `{repo_path}/README.md` — tech stack, available scripts, dev setup
+- Read `{repo_path}/CLAUDE.md` or `{repo_path}/AGENTS.md` (if exists) — coding rules, architecture
+- Read `{repo_path}/package.json` → extract `scripts` section (dev, test, build commands)
+- Extract: framework (Next.js, Expo, Hono, etc.), test command, key conventions
+- Pass this context to all sub-agents (especially test-generator)
+
+**0b. Dev server health check:**
+```bash
+curl -s -o /dev/null -w "%{http_code}" {base_url}
+```
+- If `200`: Server running, continue pipeline
+- If fail: Auto-start using `dev_command` from config:
+  ```bash
+  cd {repo_path} && {dev_command} &
+  # Poll health every 2s, timeout 30s
+  for i in $(seq 1 15); do
+    curl -s -o /dev/null -w "%{http_code}" {base_url} | grep -q "200" && break
+    sleep 2
+  done
+  ```
+- If still fail after 30s: Report as VERDICT: PARTIAL ("Server could not be started")
+
 ### Step 1: Analyze Issue
 Spawn agent: `qa-issue-analyzer`
 Input: issue URL/ID + repo config

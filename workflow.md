@@ -55,7 +55,23 @@ Scans all issues currently in QA status:
 
 ---
 
-## Pipeline (8 Steps)
+## Pipeline (9 Steps)
+
+### Step 0 — Project Context + Server Health
+
+**0a. Read project docs** before testing:
+- `{repo_path}/README.md` — tech stack, scripts, dev setup
+- `{repo_path}/CLAUDE.md` or `AGENTS.md` — coding rules, architecture (if exists)
+- `{repo_path}/package.json` → scripts section
+- Pass context to subsequent steps (especially test generation)
+
+**0b. Dev server health check:**
+```bash
+curl -s -o /dev/null -w "%{http_code}" {base_url}
+```
+- 200 → continue
+- Fail → auto-start via `dev_command` from config, poll every 2s, timeout 30s
+- Still fail → VERDICT: PARTIAL
 
 ### Step 1 — Fetch Issue
 
