@@ -153,34 +153,46 @@ fi
 # Step 3: Issue Source Wizard
 # ══════════════════════════════════════════════
 if [ "$NON_INTERACTIVE" = false ]; then
-  header "Issue Source"
+  header "Step 1: Issue Source"
+  echo "  QA Scan fetches issues to test from Linear or GitHub." > /dev/tty
+  echo "  Choose where your team tracks bugs and features." > /dev/tty
   prompt_select "Where are your issues?" "Linear" "GitHub Issues"
 
   case "$PROMPT_RESULT" in
     1)
       SOURCE="linear"
-      prompt_input "Linear project key (e.g., SKIN)" "PROJ"
+      echo "" > /dev/tty
+      echo "  Enter your Linear project key (visible in issue IDs, e.g., SKIN-101 → key is SKIN)." > /dev/tty
+      prompt_input "Linear project key" "PROJ"
       PROJECT_KEY="$PROMPT_RESULT"
 
-      header "Linear Authentication"
-      prompt_select "Auth method?" "API Key (paste key)" "OAuth (opens browser)"
+      header "Step 2: Linear Authentication"
+      echo "  QA Scan needs access to read your Linear issues." > /dev/tty
+      echo "  API Key: paste a key from linear.app/settings/api (simpler)." > /dev/tty
+      echo "  OAuth: browser login on first use (no key needed)." > /dev/tty
+      prompt_select "Auth method?" "API Key (paste key)" "OAuth (browser login on first use)"
 
       case "$PROMPT_RESULT" in
         1)
           LINEAR_AUTH_METHOD="api_key"
+          echo "" > /dev/tty
+          echo "  Create at: https://linear.app/settings/api → Personal API Keys → Create." > /dev/tty
           echo -n "  API Key: " > /dev/tty; read -s LINEAR_API_KEY < /dev/tty; echo "" > /dev/tty
           ;;
         2)
           LINEAR_AUTH_METHOD="oauth"
           echo "" > /dev/tty
-          echo "  OAuth will authenticate when you first use /qa-scan." > /dev/tty
-          echo "  The Linear MCP server will open your browser automatically." > /dev/tty
+          echo "  No action needed now. On first /qa-scan run, the Linear MCP" > /dev/tty
+          echo "  server will open your browser for authorization automatically." > /dev/tty
           ;;
       esac
       ;;
     2)
       SOURCE="github"
-      prompt_input "GitHub repo (e.g., org/repo)" "$(basename "$WORKSPACE")"
+      echo "" > /dev/tty
+      echo "  Enter the GitHub repo where issues are tracked (e.g., cyberk-dev/my-app)." > /dev/tty
+      echo "  Make sure 'gh' CLI is logged in: gh auth status" > /dev/tty
+      prompt_input "GitHub repo (org/repo)" "$(basename "$WORKSPACE")"
       GH_REPO="$PROMPT_RESULT"
       ;;
   esac
@@ -188,16 +200,29 @@ if [ "$NON_INTERACTIVE" = false ]; then
   # ══════════════════════════════════════════════
   # Step 4: Project Configuration
   # ══════════════════════════════════════════════
-  header "Project Configuration"
+  header "Step 3: Project Configuration"
+  echo "  Configure the project QA Scan will test." > /dev/tty
+  echo "" > /dev/tty
+
+  echo "  Unique name for this project in qa.config.yaml." > /dev/tty
   prompt_input "Project name/key" "$(basename "$WORKSPACE")"
   REPO_KEY="$PROMPT_RESULT"
+
+  echo "  URL where your dev server runs (Playwright connects here)." > /dev/tty
   prompt_input "Dev server URL" "http://localhost:3000"
   BASE_URL="$PROMPT_RESULT"
+
+  echo "  Command to start your dev server (used for auto-start if server is down)." > /dev/tty
   prompt_input "Dev command" "bun run dev"
   DEV_COMMAND="$PROMPT_RESULT"
+
+  echo "  Git branch to test against." > /dev/tty
   prompt_input "Main branch" "dev"
   BRANCH="$PROMPT_RESULT"
 
+  echo "" > /dev/tty
+  echo "  GitNexus provides semantic code analysis (find symbols, trace impact)." > /dev/tty
+  echo "  Requires 'gitnexus' CLI installed. Skip if unsure." > /dev/tty
   echo -n "  Use GitNexus for code analysis? [Y/n]: " > /dev/tty; read USE_GITNEXUS < /dev/tty
   USE_GITNEXUS="${USE_GITNEXUS:-Y}"
 fi
