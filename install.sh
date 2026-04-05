@@ -47,6 +47,21 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# ── Detect if stdin is a pipe (curl | bash) → read from /dev/tty ──
+if [ ! -t 0 ]; then
+  # stdin is piped (curl | bash) — redirect reads from terminal
+  if [ -t 2 ] || [ -e /dev/tty ]; then
+    exec 3</dev/tty  # open fd 3 from terminal
+    TTY_FD=3
+  else
+    # No terminal available — fall back to non-interactive
+    NON_INTERACTIVE=true
+    TTY_FD=0
+  fi
+else
+  TTY_FD=0  # stdin is terminal, use normally
+fi
+
 # ── Utility functions ──
 info()  { echo -e "${GREEN}→${NC} $*"; }
 warn()  { echo -e "${YELLOW}⚠${NC} $*"; }
@@ -55,7 +70,8 @@ header() { echo -e "\n${CYAN}── $* ──${NC}"; }
 prompt_input() {
   local prompt="$1" default="$2" result
   if [ "$NON_INTERACTIVE" = true ]; then echo "$default"; return; fi
-  read -p "$prompt [$default]: " result
+  echo -n "  $prompt [$default]: "
+  read result <&$TTY_FD
   echo "${result:-$default}"
 }
 
@@ -67,8 +83,9 @@ prompt_select() {
   for i in "${!options[@]}"; do
     echo "  [$((i+1))] ${options[$i]}"
   done
+  echo -n "  $prompt: "
   local choice
-  read -p "$prompt: " choice
+  read choice <&$TTY_FD
   echo "${choice:-1}"
 }
 
@@ -157,7 +174,7 @@ if [ "$NON_INTERACTIVE" = false ]; then
       case "$AUTH_CHOICE" in
         1)
           LINEAR_AUTH_METHOD="api_key"
-          read -sp "  API Key: " LINEAR_API_KEY; echo ""
+          echo -n "  API Key: "; read -s LINEAR_API_KEY <&$TTY_FD; echo ""
           ;;
         2)
           LINEAR_AUTH_METHOD="oauth"
@@ -179,7 +196,7 @@ if [ "$NON_INTERACTIVE" = false ]; then
   DEV_COMMAND=$(prompt_input "Dev command" "bun run dev")
   BRANCH=$(prompt_input "Main branch" "dev")
 
-  read -p "  Use GitNexus for code analysis? [Y/n]: " USE_GITNEXUS
+  echo -n "  Use GitNexus for code analysis? [Y/n]: "; read USE_GITNEXUS <&$TTY_FD
   USE_GITNEXUS="${USE_GITNEXUS:-Y}"
 fi
 
@@ -250,13 +267,15 @@ configure_mcp() {
 
   mkdir -p "$(dirname "$config_file")"
 
-  if [ -f "$config_file" ]; then
-    # Merge into existing config
+  if [ -f "$config_file" ] && [ -s "$config_file" ]; then
+    # File exists and is non-empty — merge into existing config
+    # Ensure mcpServers key exists before merging
+    local tmp_file="${config_file}.tmp"
     jq --arg key "$mcp_key" --argjson val "$mcp_value" \
-      '.mcpServers[$key] = $val' "$config_file" > "$config_file.tmp" \
-      && mv "$config_file.tmp" "$config_file"
+      'if .mcpServers then .mcpServers[$key] = $val else . + {mcpServers: {($key): $val}} end' \
+      "$config_file" > "$tmp_file" && mv "$tmp_file" "$config_file"
   else
-    # Create new
+    # File doesn't exist or is empty — create new
     jq -n --arg key "$mcp_key" --argjson val "$mcp_value" \
       '{mcpServers: {($key): $val}}' > "$config_file"
   fi
