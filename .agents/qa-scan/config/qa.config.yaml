@@ -1,0 +1,89 @@
+# QA Scan Configuration
+# Source of truth for repo definitions used by all AI agents
+
+defaults:
+  video: true
+  trace: true
+  screenshots: true
+  evidence_dir: ./evidence
+  selectors: accessibility-first  # getByRole > getByLabel > getByText > getByTestId
+  self_healing_retries: 1         # Retry with DOM snapshot if test fails on selector
+
+repos:
+  skin-agent-fe:
+    path: ../skin-agent-fe
+    base_url: http://localhost:3001
+    dev_command: bun run dev:web
+    source: linear
+    project_key: SKIN
+    branch: dev
+    gitnexus: true
+    auth:
+      strategy: storage-state
+      state_file: ./auth-state-skin.json
+      login_url: /login
+      credentials_env:
+        email: QA_AUTH_EMAIL
+        password: QA_AUTH_PASSWORD
+
+  openclaw-services:
+    path: ../openclaw-services
+    base_url: http://localhost:8080
+    dev_command: bun run dev
+    source: github
+    repo: cyberk-dev/openclaw-services
+    branch: main
+    gitnexus: false
+    auth:
+      strategy: skip
+
+  # Template for adding new repos:
+  # my-repo:
+  #   path: ../my-repo
+  #   base_url: http://localhost:XXXX
+  #   dev_command: bun run dev
+  #   source: linear | github
+  #   project_key: KEY          # for Linear source
+  #   repo: org/repo            # for GitHub source
+  #   branch: dev | main
+  #   gitnexus: true | false
+  #   auth:
+  #     strategy: skip | storage-state
+  #     state_file: ./auth-state-{repo}.json
+  #     login_url: /login
+  #     credentials_env:
+  #       email: QA_AUTH_EMAIL
+  #       password: QA_AUTH_PASSWORD
+
+# === Phase 4: Automation ===
+
+webhook:
+  enabled: false                    # Enable when webhook bridge is deployed
+  port: 3456
+  secret_env: LINEAR_WEBHOOK_SECRET
+  auto_trigger:
+    status: "QA"                    # Trigger on this Linear status
+    cooldown: 300                   # Seconds between re-triggers per issue
+
+vision:
+  enabled: false                    # Enable for AI screenshot analysis
+  model: gemini-2.5-flash           # Via cliproxy or native agent vision
+  max_screenshots: 5                # Analyze top N screenshots per run
+  confidence_threshold: 0.5         # Below this → contributes to FAIL
+
+auto_post:
+  enabled: true                     # Auto-post report to issue
+  format: summary                   # summary (short) or full (entire report)
+
+# === Zero-Touch Automation ===
+
+labels:
+  pass: "qa-auto-passed"
+  fail: "qa-auto-failed"
+  partial: "qa-needs-manual"
+
+orchestrator:
+  poll_interval: 600                # Seconds between polls in watch mode
+  delay_between_issues: 30          # Seconds between processing issues
+  max_issues_per_run: 10            # Prevent runaway scans
+  dry_run: false                    # Set true to preview without running

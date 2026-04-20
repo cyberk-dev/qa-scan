@@ -1,0 +1,8 @@
+evidence/results/
+evidence/html-report/
+evidence/*/video.*
+evidence/*/trace.*
+evidence/*/screenshots/
+evidence/results.json
+node_modules/
+auth-state*.json

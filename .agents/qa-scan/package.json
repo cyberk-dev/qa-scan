@@ -1,0 +1,17 @@
+{
+  "name": "qa-scan",
+  "private": true,
+  "scripts": {
+    "setup": "bash scripts/install.sh",
+    "verify": "bash scripts/verify.sh",
+    "test:e2e": "npx playwright test --config=scripts/playwright.config.ts",
+    "webhook": "bun run scripts/linear-webhook-bridge.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^25.5.2"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  }
+}
