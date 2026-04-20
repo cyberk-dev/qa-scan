@@ -1,0 +1,8 @@
+{
+  "id": "TC-LOGIN-002",
+  "title": "Invalid password shows error message",
+  "description": "As a user, when I enter wrong password, I should see an error message.\n\nTest Steps:\n1. Navigate to /login\n2. Enter email: alice@example.com\n3. Enter password: wrongpassword\n4. Click \"Sign In\"\n5. Verify error message displays\n6. Verify still on login page\n\nExpected: Error \"Invalid email or password\" shown",
+  "labels": ["qa-candidate"],
+  "priority": "medium",
+  "state": "backlog"
+}

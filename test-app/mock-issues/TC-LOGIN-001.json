@@ -1,0 +1,8 @@
+{
+  "id": "TC-LOGIN-001",
+  "title": "Valid login redirects to dashboard",
+  "description": "As a user, when I enter valid credentials on the login page, I should be redirected to the dashboard.\n\nTest Steps:\n1. Navigate to /login\n2. Enter email: alice@example.com\n3. Enter password: admin123\n4. Click \"Sign In\"\n5. Verify redirected to /dashboard\n6. Verify dashboard displays username\n\nExpected: User sees dashboard with their name in nav",
+  "labels": ["qa-candidate"],
+  "priority": "medium",
+  "state": "backlog"
+}

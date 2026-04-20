@@ -1,0 +1,8 @@
+{
+  "id": "TC-PROFILE-001",
+  "title": "Update profile successfully",
+  "description": "As a user, I can update my profile settings.\n\nPrecondition: Logged in\n\nTest Steps:\n1. Navigate to /profile\n2. Fill display name field\n3. Toggle notifications checkbox\n4. Select a theme\n5. Click \"Save Settings\"\n6. Verify success message appears\n\nExpected: Profile updated, success message shown",
+  "labels": ["qa-candidate"],
+  "priority": "medium",
+  "state": "backlog"
+}

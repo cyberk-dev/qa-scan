@@ -1,0 +1,8 @@
+{
+  "id": "TC-USER-001",
+  "title": "Create new user successfully",
+  "description": "As an admin, I can create a new user.\n\nPrecondition: Logged in as admin\n\nTest Steps:\n1. Navigate to /users\n2. Click \"+ New User\"\n3. Fill form: name=\"Test User\", email=\"test@new.com\", role=\"user\"\n4. Click \"Create\"\n5. Verify redirected to /users\n6. Verify new user appears in list\n7. Verify success toast appears\n\nExpected: User created and visible in list",
+  "labels": ["qa-candidate"],
+  "priority": "high",
+  "state": "backlog"
+}

@@ -1,93 +1,131 @@
-/**
- * Dummy test app for QA Scan E2E testing
- * Run: bun test-app/server.ts
- * Serves: http://localhost:4000
- */
+// QA Test App - Hono server with auth, CRUD, and UI features
+import { Hono } from 'hono';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
+import { db } from './data';
+import { layout } from './views/layout';
+import { loginPage } from './views/login';
+import { dashboardPage } from './views/dashboard';
+import { usersListPage, userFormPage } from './views/users';
+import { profilePage } from './views/profile';
 
-const html = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><title>Test App</title></head>
-<body>
-  <h1>Product Detail</h1>
-  <main>
-    <section aria-label="Product Info">
-      <h2 id="product-name">Moisturizer SPF 50</h2>
-      <p>A daily moisturizer with sun protection.</p>
-      <span aria-label="Price">$24.99</span>
-    </section>
+const app = new Hono();
 
-    <section aria-label="Ingredients">
-      <h3>Ingredients Analysis</h3>
-      <ul role="list" aria-label="Beneficial ingredients">
-        <li>Niacinamide — Brightening</li>
-        <li>Hyaluronic Acid — Hydration</li>
-        <li>Vitamin E — Antioxidant</li>
-      </ul>
-    </section>
+// Auth middleware
+const requireAuth = async (c: any, next: () => Promise<void>) => {
+  const token = getCookie(c, 'session');
+  if (!token) return c.redirect('/login');
+  const session = db.getSession(token);
+  if (!session) {
+    deleteCookie(c, 'session');
+    return c.redirect('/login');
+  }
+  c.set('session', session);
+  c.set('token', token);
+  await next();
+};
 
-    <section aria-label="Actions">
-      <button type="button" onclick="addToRoutine()">Add to Routine</button>
-      <button type="button" onclick="analyze()">Analyze Product</button>
-    </section>
+// Public routes
+app.get('/', (c) => c.redirect('/login'));
 
-    <div id="status" role="status" aria-live="polite"></div>
-    <div id="analysis" hidden>
-      <h3>AI Analysis</h3>
-      <p>This product is suitable for daily use. SPF 50 provides excellent UV protection.</p>
-    </div>
-  </main>
-
-  <script>
-    function addToRoutine() {
-      document.getElementById('status').textContent = 'Added to your routine!';
-    }
-    function analyze() {
-      const btn = event.target;
-      btn.disabled = true;
-      btn.textContent = 'Analyzing...';
-      setTimeout(() => {
-        document.getElementById('analysis').hidden = false;
-        btn.textContent = 'Analyze Product';
-        btn.disabled = false;
-        document.getElementById('status').textContent = 'Analysis complete';
-      }, 1000);
-    }
-  </script>
-</body>
-</html>`;
-
-Bun.serve({
-  port: 4000,
-  fetch(req) {
-    const url = new URL(req.url);
-
-    if (url.pathname === '/') {
-      return new Response(html, { headers: { 'content-type': 'text/html' } });
-    }
-
-    if (url.pathname === '/api/products/123') {
-      return Response.json({
-        id: 123,
-        name: 'Moisturizer SPF 50',
-        price: 24.99,
-        ingredients: [
-          { name: 'Niacinamide', effect: 'Brightening' },
-          { name: 'Hyaluronic Acid', effect: 'Hydration' },
-          { name: 'Vitamin E', effect: 'Antioxidant' },
-        ],
-      });
-    }
-
-    if (url.pathname === '/api/products/123/analyze') {
-      return Response.json({
-        verdict: 'good',
-        score: 8.5,
-        summary: 'Suitable for daily use with excellent UV protection.',
-      });
-    }
-
-    return new Response('Not found', { status: 404 });
-  },
+app.get('/login', (c) => {
+  const token = getCookie(c, 'session');
+  if (token && db.getSession(token)) return c.redirect('/dashboard');
+  return c.html(loginPage());
 });
 
-console.log('🧪 Test app running at http://localhost:4000');
+app.post('/login', async (c) => {
+  const body = await c.req.parseBody();
+  const email = body.email as string;
+  const password = body.password as string;
+  const session = db.authenticate(email, password);
+  if (!session) return c.html(loginPage('Invalid email or password'));
+
+  // Get the token that was just created
+  const token = crypto.randomUUID();
+  setCookie(c, 'session', token, { path: '/', httpOnly: true, maxAge: 86400 });
+
+  // Store session with our token
+  (db as any).sessions = (db as any).sessions || new Map();
+  (db as any).sessions.set(token, session);
+
+  return c.redirect('/dashboard');
+});
+
+app.post('/logout', (c) => {
+  const token = getCookie(c, 'session');
+  if (token) db.deleteSession(token);
+  deleteCookie(c, 'session');
+  return c.redirect('/login');
+});
+
+// Protected routes
+app.get('/dashboard', requireAuth, (c) => {
+  const session = c.get('session');
+  const stats = db.getStats();
+  return c.html(layout('Dashboard', dashboardPage(stats), session));
+});
+
+app.get('/users', requireAuth, (c) => {
+  const session = c.get('session');
+  const name = c.req.query('name');
+  const role = c.req.query('role');
+  const users = db.listUsers({ name, role });
+  return c.html(layout('Users', usersListPage(users, { name, role }), session));
+});
+
+app.get('/users/new', requireAuth, (c) => {
+  const session = c.get('session');
+  return c.html(layout('New User', userFormPage(), session));
+});
+
+app.post('/users', requireAuth, async (c) => {
+  const body = await c.req.parseBody();
+  db.createUser({
+    name: body.name as string,
+    email: body.email as string,
+    role: body.role as 'admin' | 'user' | 'viewer',
+  });
+  return c.redirect('/users?toast=User created successfully');
+});
+
+app.get('/users/:id/edit', requireAuth, (c) => {
+  const session = c.get('session');
+  const user = db.getUser(c.req.param('id'));
+  if (!user) return c.redirect('/users?toast=User not found&type=error');
+  return c.html(layout('Edit User', userFormPage(user), session));
+});
+
+app.post('/users/:id', requireAuth, async (c) => {
+  const body = await c.req.parseBody();
+  db.updateUser(c.req.param('id'), {
+    name: body.name as string,
+    email: body.email as string,
+    role: body.role as 'admin' | 'user' | 'viewer',
+  });
+  return c.redirect('/users?toast=User updated successfully');
+});
+
+app.post('/users/:id/delete', requireAuth, (c) => {
+  db.deleteUser(c.req.param('id'));
+  return c.redirect('/users?toast=User deleted successfully');
+});
+
+app.get('/profile', requireAuth, (c) => {
+  const session = c.get('session');
+  const message = c.req.query('saved') ? 'Settings saved successfully' : undefined;
+  return c.html(layout('Profile', profilePage(message), session));
+});
+
+app.post('/profile', requireAuth, async (c) => {
+  return c.redirect('/profile?saved=1');
+});
+
+// Health check for E2E tests
+app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+export default {
+  port: 3001,
+  fetch: app.fetch,
+};
+
+console.log('🚀 QA Test App running on http://localhost:3001');

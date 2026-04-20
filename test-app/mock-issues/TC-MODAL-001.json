@@ -1,0 +1,8 @@
+{
+  "id": "TC-MODAL-001",
+  "title": "Confirm delete modal can be cancelled",
+  "description": "As a user, when I click delete, a confirmation modal appears. I can cancel without deleting.\n\nPrecondition: Logged in as admin, users exist\n\nTest Steps:\n1. Navigate to /users\n2. Click Delete on a user\n3. Verify modal appears with user name\n4. Click \"Cancel\"\n5. Verify modal closes\n6. Verify user still in list\n\nExpected: Modal cancellable, no deletion occurs",
+  "labels": ["qa-candidate"],
+  "priority": "medium",
+  "state": "backlog"
+}

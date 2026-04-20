@@ -1,0 +1,43 @@
+// Login page view
+
+export const loginPage = (error?: string) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - QA Test App</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+    <h1 class="text-2xl font-bold text-center mb-6" data-testid="login-title">QA Test App</h1>
+    ${error ? `<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" data-testid="login-error">${error}</div>` : ''}
+    <form action="/login" method="POST" data-testid="login-form">
+      <div class="mb-4">
+        <label for="email" class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+        <input type="email" id="email" name="email" required
+          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+          data-testid="email-input" placeholder="alice@example.com">
+      </div>
+      <div class="mb-6">
+        <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+        <input type="password" id="password" name="password" required
+          class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+          data-testid="password-input" placeholder="••••••••">
+      </div>
+      <button type="submit"
+        class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+        data-testid="login-submit">
+        Sign In
+      </button>
+    </form>
+    <div class="mt-4 text-sm text-gray-600 text-center">
+      <p>Demo accounts:</p>
+      <p>alice@example.com / admin123</p>
+      <p>bob@example.com / user123</p>
+    </div>
+  </div>
+</body>
+</html>
+`;

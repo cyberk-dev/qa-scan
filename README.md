@@ -8,7 +8,7 @@ Works with: **Claude Code** (native agents) | **Gemini CLI** (native agents) | *
 
 ### Prerequisites
 
-Install an AI coding agent (one of):
+**Just need an AI coding agent** (one of):
 
 ```bash
 # Claude Code (recommended)
@@ -18,6 +18,8 @@ claude login
 # Or: Gemini CLI, Antigravity, etc.
 ```
 
+Everything else (git, Homebrew, system packages) installs automatically.
+
 ### 1-Command Setup
 
 ```bash
@@ -25,14 +27,18 @@ curl -fsSL https://raw.githubusercontent.com/cyberk-dev/qa-scan/main/install.sh 
 ```
 
 The interactive wizard will:
-1. Auto-install **Bun + jq** (if missing)
-2. Clone qa-scan repo to `.agents/qa-scan/`
-3. Ask: **Linear** or **GitHub Issues**? Configure auth (API key or OAuth)
-4. Configure your project (URL, dev command, branch)
-5. Auto-setup **MCP servers** (Linear + GitNexus → `.claude/mcp.json`)
-6. Install **Playwright + Chromium**
-7. Detect AI agents and install: Claude + Gemini agents
-8. Print usage instructions
+1. **Auto-detect OS** (macOS/Linux) + **CI environments** (GitHub Actions, GitLab, etc.)
+2. **Bootstrap system tools** (Xcode CLT, Homebrew on macOS; apt packages on Linux)
+3. **Install core tools** (git, jq, gh) if missing
+4. Auto-install **Bun** (if missing)
+5. Clone qa-scan repo to `.agents/qa-scan/`
+6. Ask: **Linear** or **GitHub Issues**? Configure auth (API key or OAuth)
+7. Configure your project (URL, dev command, branch)
+8. Auto-setup **MCP servers** (Linear + GitNexus → `.claude/mcp.json`)
+9. Install **Playwright + Chromium**
+10. Auto-install + index **GitNexus** (if enabled)
+11. Detect AI agents and install: Claude + Gemini agents
+12. Print usage instructions
 
 ### Options
 

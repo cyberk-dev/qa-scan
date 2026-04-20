@@ -1,0 +1,8 @@
+{
+  "id": "TC-USER-002",
+  "title": "Edit existing user",
+  "description": "As an admin, I can edit an existing user's details.\n\nPrecondition: Logged in as admin, users exist\n\nTest Steps:\n1. Navigate to /users\n2. Click Edit on first user\n3. Change name to \"Updated Name\"\n4. Click \"Update\"\n5. Verify redirected to /users\n6. Verify name changed in list\n7. Verify success toast appears\n\nExpected: User name updated in list",
+  "labels": ["qa-candidate"],
+  "priority": "high",
+  "state": "backlog"
+}

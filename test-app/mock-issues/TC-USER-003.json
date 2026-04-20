@@ -1,0 +1,8 @@
+{
+  "id": "TC-USER-003",
+  "title": "Delete user with confirmation",
+  "description": "As an admin, I can delete a user after confirming.\n\nPrecondition: Logged in as admin, multiple users exist\n\nTest Steps:\n1. Navigate to /users\n2. Click Delete on a user\n3. Verify confirmation modal appears\n4. Click \"Delete\" in modal\n5. Verify user removed from list\n6. Verify success toast appears\n\nExpected: User deleted, toast confirms action",
+  "labels": ["qa-candidate"],
+  "priority": "high",
+  "state": "backlog"
+}

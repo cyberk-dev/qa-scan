@@ -1,0 +1,8 @@
+{
+  "id": "TC-SEARCH-001",
+  "title": "Search filters users by name",
+  "description": "As a user, I can search for users by name.\n\nPrecondition: Logged in, users with different names exist\n\nTest Steps:\n1. Navigate to /users\n2. Enter \"Alice\" in search field\n3. Click Search\n4. Verify list filters to show only matching users\n5. Verify URL contains search param\n\nExpected: Only users with \"Alice\" in name shown",
+  "labels": ["qa-candidate"],
+  "priority": "medium",
+  "state": "backlog"
+}

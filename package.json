@@ -5,6 +5,7 @@
     "setup": "bash scripts/install.sh",
     "verify": "bash scripts/verify.sh",
     "test:e2e": "npx playwright test --config=scripts/playwright.config.ts",
+    "test-app": "bun run test-app/server.ts",
     "webhook": "bun run scripts/linear-webhook-bridge.ts"
   },
   "devDependencies": {

@@ -52,6 +52,15 @@ if [ ! -e /dev/tty ] && [ ! -t 0 ]; then
   NON_INTERACTIVE=true
 fi
 
+# ── CI/CD Detection ──
+IS_CI=false
+if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ] || [ -n "${GITLAB_CI:-}" ] || \
+   [ -n "${CIRCLECI:-}" ] || [ -n "${JENKINS_URL:-}" ] || [ -n "${TF_BUILD:-}" ] || \
+   [ -n "${BITBUCKET_BUILD_NUMBER:-}" ] || [ -n "${TRAVIS:-}" ] || [ -n "${BUILDKITE:-}" ]; then
+  IS_CI=true
+  NON_INTERACTIVE=true
+fi
+
 # ── Utility functions ──
 info()  { echo -e "${GREEN}→${NC} $*"; }
 warn()  { echo -e "${YELLOW}⚠${NC} $*"; }
@@ -82,6 +91,174 @@ prompt_select() {
   PROMPT_RESULT="${PROMPT_RESULT:-1}"
 }
 
+# ── macOS Bootstrap ──
+bootstrap_macos() {
+  if [ "$IS_CI" = true ] || [ "$NON_INTERACTIVE" = true ]; then
+    info "Non-interactive mode — skipping macOS GUI bootstrap"
+    if ! xcode-select -p &>/dev/null; then
+      warn "Xcode CLT required but not found. Install manually: xcode-select --install"
+      warn "Then re-run this script."
+      exit 1
+    fi
+    return 0
+  fi
+
+  if [ ! -t 0 ] && [ ! -e /dev/tty ]; then
+    warn "No TTY available for interactive prompts."
+    warn "Run with --non-interactive or install Xcode CLT manually first."
+    exit 1
+  fi
+
+  if ! xcode-select -p &>/dev/null; then
+    warn "Xcode Command Line Tools not found"
+    echo "  Installing CLT (this may open a dialog)..."
+    xcode-select --install 2>/dev/null || true
+
+    echo "  Waiting for CLT installation to complete..."
+    echo "  (This may take several minutes. Press Ctrl+C to abort.)"
+    local attempts=0
+    local max_attempts=360
+    while ! xcode-select -p &>/dev/null; do
+      sleep 5
+      attempts=$((attempts + 1))
+      if [ "$attempts" -ge "$max_attempts" ]; then
+        warn "CLT installation timed out after 30 minutes."
+        exit 1
+      fi
+    done
+  fi
+  info "Xcode CLT: $(xcode-select -p)"
+
+  if ! command -v brew &>/dev/null; then
+    info "Installing Homebrew..."
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+    if [ -f /opt/homebrew/bin/brew ]; then
+      eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [ -f /usr/local/bin/brew ]; then
+      eval "$(/usr/local/bin/brew shellenv)"
+    fi
+  fi
+
+  if command -v brew &>/dev/null; then
+    info "Homebrew $(brew --version | head -1)"
+  else
+    warn "Homebrew installation may require terminal restart"
+  fi
+}
+
+# ── Linux Bootstrap ──
+bootstrap_linux() {
+  if ! command -v apt-get &>/dev/null; then
+    warn "apt-get not found. This script supports Debian/Ubuntu-based systems."
+    warn "For other distros, install manually: git, jq, gh, bun"
+    return 1
+  fi
+
+  if [ "$(id -u)" -ne 0 ]; then
+    if ! command -v sudo &>/dev/null; then
+      warn "sudo not found and not running as root. Cannot install packages."
+      warn "Run as root or install sudo first."
+      return 1
+    fi
+    if [ "$NON_INTERACTIVE" = true ] || [ "$IS_CI" = true ]; then
+      if ! sudo -n true 2>/dev/null; then
+        warn "Non-interactive mode requires passwordless sudo."
+        warn "Add user to sudoers with NOPASSWD or run as root."
+        return 1
+      fi
+    fi
+  fi
+
+  info "Updating apt package lists..."
+  sudo apt-get update -qq || warn "apt update failed — continuing anyway"
+
+  info "Linux bootstrap ready (apt available)"
+}
+
+# ── Core Tools Installation ──
+INSTALL_FAILURES=""
+
+install_tool() {
+  local tool="$1"
+  local brew_pkg="${2:-$tool}"
+  local apt_pkg="${3:-$tool}"
+
+  if command -v "$tool" &>/dev/null; then
+    return 0
+  fi
+
+  info "Installing $tool..."
+
+  if [ "$OS" = "Darwin" ]; then
+    if command -v brew &>/dev/null; then
+      if ! brew install "$brew_pkg" 2>>/tmp/qa-scan-install.log; then
+        warn "Failed to install $tool via brew (see /tmp/qa-scan-install.log)"
+        INSTALL_FAILURES="$INSTALL_FAILURES $tool"
+        return 1
+      fi
+    else
+      warn "Cannot install $tool — Homebrew not available"
+      INSTALL_FAILURES="$INSTALL_FAILURES $tool"
+      return 1
+    fi
+  else
+    if [ "$tool" = "gh" ] && ! apt-cache show gh &>/dev/null 2>&1; then
+      info "Adding GitHub CLI apt repository..."
+      if curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+          sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null; then
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | \
+          sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        sudo apt-get update -qq 2>/dev/null
+      else
+        warn "Failed to add GitHub CLI apt repository"
+      fi
+    fi
+
+    if command -v apt-get &>/dev/null; then
+      if ! sudo apt-get install -y "$apt_pkg" 2>>/tmp/qa-scan-install.log; then
+        warn "Failed to install $tool via apt (see /tmp/qa-scan-install.log)"
+        INSTALL_FAILURES="$INSTALL_FAILURES $tool"
+        return 1
+      fi
+    else
+      warn "Cannot install $tool — apt not available"
+      INSTALL_FAILURES="$INSTALL_FAILURES $tool"
+      return 1
+    fi
+  fi
+}
+
+install_core_tools() {
+  install_tool "git" "git" "git"
+  if command -v git &>/dev/null; then
+    info "Git $(git --version | cut -d' ' -f3)"
+  else
+    warn "Git is required but could not be installed."
+    warn "Install git manually and re-run this script."
+    exit 1
+  fi
+
+  install_tool "jq" "jq" "jq"
+  if command -v jq &>/dev/null; then
+    info "jq $(jq --version)"
+  else
+    warn "jq not found — MCP config may fail"
+  fi
+
+  install_tool "gh" "gh" "gh"
+  if command -v gh &>/dev/null; then
+    info "gh $(gh --version | head -1 | cut -d' ' -f3)"
+  else
+    warn "gh CLI not found — GitHub issues won't work"
+    warn "Install manually: https://cli.github.com/"
+  fi
+
+  if [ -n "$INSTALL_FAILURES" ]; then
+    warn "Failed to install:$INSTALL_FAILURES"
+  fi
+}
+
 # ══════════════════════════════════════════════
 # Step 1: Environment Detection
 # ══════════════════════════════════════════════
@@ -99,6 +276,19 @@ IS_REPO=false
 # Detect OS
 OS="$(uname -s)"
 info "OS: $OS"
+if [ "$IS_CI" = true ]; then
+  info "CI environment detected — running non-interactive"
+fi
+
+# Bootstrap based on OS
+if [ "$OS" = "Darwin" ]; then
+  bootstrap_macos
+elif [ "$OS" = "Linux" ]; then
+  bootstrap_linux
+fi
+
+# Install core tools (git, jq, gh)
+install_core_tools
 
 # Check/install bun
 if ! command -v bun &>/dev/null; then
@@ -107,16 +297,6 @@ if ! command -v bun &>/dev/null; then
   export PATH="$HOME/.bun/bin:$PATH"
 fi
 info "Bun $(bun --version)"
-
-# Check jq
-if ! command -v jq &>/dev/null; then
-  info "Installing jq (needed for MCP config)..."
-  if [ "$OS" = "Darwin" ]; then
-    brew install jq 2>/dev/null || warn "Install jq manually: brew install jq"
-  else
-    sudo apt-get install -y jq 2>/dev/null || warn "Install jq manually: apt install jq"
-  fi
-fi
 
 # Detect AI agent directories
 HAS_CLAUDE=false; [ -d "$WORKSPACE/.claude" ] && HAS_CLAUDE=true
@@ -166,26 +346,9 @@ if [ "$NON_INTERACTIVE" = false ]; then
       prompt_input "Linear project key" "PROJ"
       PROJECT_KEY="$PROMPT_RESULT"
 
-      header "Step 2: Linear Authentication"
-      echo "  QA Scan needs access to read your Linear issues." > /dev/tty
-      echo "  API Key: paste a key from linear.app/settings/api (simpler)." > /dev/tty
-      echo "  OAuth: browser login on first use (no key needed)." > /dev/tty
-      prompt_select "Auth method?" "API Key (paste key)" "OAuth (browser login on first use)"
-
-      case "$PROMPT_RESULT" in
-        1)
-          LINEAR_AUTH_METHOD="api_key"
-          echo "" > /dev/tty
-          echo "  Create at: https://linear.app/settings/api → Personal API Keys → Create." > /dev/tty
-          echo -n "  API Key: " > /dev/tty; read -s LINEAR_API_KEY < /dev/tty; echo "" > /dev/tty
-          ;;
-        2)
-          LINEAR_AUTH_METHOD="oauth"
-          echo "" > /dev/tty
-          echo "  No action needed now. On first /qa-scan run, the Linear MCP" > /dev/tty
-          echo "  server will open your browser for authorization automatically." > /dev/tty
-          ;;
-      esac
+      echo "" > /dev/tty
+      echo "  Linear uses OAuth — on first /qa-scan run, your browser will" > /dev/tty
+      echo "  open for authorization automatically. No API key needed." > /dev/tty
       ;;
     2)
       SOURCE="github"
@@ -315,18 +478,16 @@ configure_mcp() {
 if [ "$NON_INTERACTIVE" = false ]; then
   header "MCP Configuration"
 
-  # Linear MCP
+  # Project-level MCP config: .mcp.json (Claude Code reads this)
+  PROJECT_MCP="$WORKSPACE/.mcp.json"
+
+  # Linear MCP (uses mcp-remote with OAuth 2.1)
   if [ "$SOURCE" = "linear" ]; then
-    if [ "$LINEAR_AUTH_METHOD" = "api_key" ] && [ -n "$LINEAR_API_KEY" ]; then
-      MCP_LINEAR=$(jq -n --arg key "$LINEAR_API_KEY" \
-        '{command:"npx",args:["-y","@linear/mcp-server"],env:{LINEAR_API_KEY:$key}}')
-    else
-      MCP_LINEAR='{"command":"npx","args":["-y","@linear/mcp-server","--oauth"]}'
-    fi
+    MCP_LINEAR='{"command":"npx","args":["-y","mcp-remote","https://mcp.linear.app/mcp"]}'
 
     if [ "$HAS_CLAUDE" = true ]; then
-      configure_mcp "$WORKSPACE/.claude/mcp.json" "linear" "$MCP_LINEAR"
-      info "Linear MCP → .claude/mcp.json"
+      configure_mcp "$PROJECT_MCP" "linear" "$MCP_LINEAR"
+      info "Linear MCP → .mcp.json"
     fi
     if [ "$HAS_GEMINI" = true ]; then
       configure_mcp "$WORKSPACE/.gemini/settings.json" "linear" "$MCP_LINEAR"
@@ -336,10 +497,10 @@ if [ "$NON_INTERACTIVE" = false ]; then
 
   # GitNexus MCP
   if [[ "${USE_GITNEXUS}" =~ ^[Yy] ]] && command -v gitnexus &>/dev/null; then
-    MCP_GITNEXUS='{"command":"gitnexus","args":["mcp"]}'
+    MCP_GITNEXUS='{"type":"stdio","command":"npx","args":["-y","gitnexus","mcp"],"env":{}}'
     if [ "$HAS_CLAUDE" = true ]; then
-      configure_mcp "$WORKSPACE/.claude/mcp.json" "gitnexus" "$MCP_GITNEXUS"
-      info "GitNexus MCP → .claude/mcp.json"
+      configure_mcp "$PROJECT_MCP" "gitnexus" "$MCP_GITNEXUS"
+      info "GitNexus MCP → .mcp.json"
     fi
     if [ "$HAS_GEMINI" = true ]; then
       configure_mcp "$WORKSPACE/.gemini/settings.json" "gitnexus" "$MCP_GITNEXUS"
@@ -352,9 +513,16 @@ fi
 # Step 6: Install Dependencies
 # ══════════════════════════════════════════════
 header "Dependencies"
-info "Installing Playwright..."
-bun install 2>/dev/null
-npx playwright install chromium 2>/dev/null
+info "Installing npm dependencies..."
+if ! bun install 2>>/tmp/qa-scan-install.log; then
+  warn "bun install failed (see /tmp/qa-scan-install.log)"
+fi
+
+info "Installing Playwright browser..."
+if ! npx playwright install chromium 2>>/tmp/qa-scan-install.log; then
+  warn "Playwright browser install failed"
+  warn "Run manually: npx playwright install chromium"
+fi
 
 # Evidence files
 mkdir -p evidence/logs
@@ -362,10 +530,49 @@ mkdir -p evidence/logs
 [ -f evidence/qa-tracker.json ] || echo "[]" > evidence/qa-tracker.json
 [ -f evidence/flaky-memory.json ] || echo "[]" > evidence/flaky-memory.json
 
-# GitNexus initial index
-if [[ "${USE_GITNEXUS}" =~ ^[Yy] ]] && command -v gitnexus &>/dev/null; then
-  info "Indexing codebase with GitNexus..."
-  gitnexus analyze --incremental "$WORKSPACE" 2>/dev/null || warn "GitNexus indexing skipped"
+# GitNexus auto-install and initial index
+if [[ "${USE_GITNEXUS}" =~ ^[Yy] ]]; then
+  if ! command -v gitnexus &>/dev/null; then
+    info "Installing GitNexus CLI..."
+
+    install_gitnexus_global() {
+      local pkg_mgr="$1"
+      local prefix
+      if [ "$pkg_mgr" = "bun" ]; then
+        prefix="${BUN_INSTALL:-$HOME/.bun}"
+      else
+        prefix="$(npm config get prefix 2>/dev/null)"
+      fi
+
+      if [ -n "$prefix" ] && [ -w "$prefix" ] 2>/dev/null; then
+        "$pkg_mgr" install -g gitnexus 2>>/tmp/qa-scan-install.log
+      else
+        info "Global dir not writable — will use npx gitnexus instead"
+        return 1
+      fi
+    }
+
+    if command -v bun &>/dev/null; then
+      install_gitnexus_global "bun" || {
+        if command -v npm &>/dev/null; then
+          install_gitnexus_global "npm"
+        fi
+      }
+    elif command -v npm &>/dev/null; then
+      install_gitnexus_global "npm"
+    else
+      warn "Cannot install GitNexus — npm/bun not available"
+    fi
+  fi
+
+  if command -v gitnexus &>/dev/null; then
+    info "GitNexus $(gitnexus --version 2>/dev/null || echo 'installed')"
+    info "Indexing codebase with GitNexus..."
+    gitnexus analyze --incremental "$WORKSPACE" 2>/dev/null || warn "GitNexus indexing skipped"
+  else
+    warn "GitNexus not available — code analysis disabled"
+    warn "Install manually: npm install -g gitnexus"
+  fi
 fi
 
 # ══════════════════════════════════════════════
