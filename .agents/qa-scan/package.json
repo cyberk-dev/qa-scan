@@ -1,9 +1,13 @@
 {
-  "name": "qa-scan",
-  "private": true,
+  "name": "@cyberk/qa-scan",
+  "version": "3.0.0",
+  "type": "module",
+  "bin": {
+    "qa-scan": "./cli/index.ts"
+  },
   "scripts": {
-    "setup": "bash scripts/install.sh",
-    "verify": "bash scripts/verify.sh",
+    "setup": "bun run cli/index.ts install",
+    "verify": "bun run cli/index.ts verify",
     "test:e2e": "npx playwright test --config=scripts/playwright.config.ts",
     "webhook": "bun run scripts/linear-webhook-bridge.ts"
   },
