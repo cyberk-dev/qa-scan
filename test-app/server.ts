@@ -124,8 +124,8 @@ app.post('/profile', requireAuth, async (c) => {
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 export default {
-  port: 3001,
+  port: 3002,
   fetch: app.fetch,
 };
 
-console.log('🚀 QA Test App running on http://localhost:3001');
+console.log('🚀 QA Test App running on http://localhost:3002');

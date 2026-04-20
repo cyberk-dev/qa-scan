@@ -28,23 +28,43 @@ mkdir -p "$WORKSPACE/.claude/skills/qa-scan"
 cat > "$WORKSPACE/.claude/skills/qa-scan/SKILL.md" << 'CLAUDE_ADAPTER'
 ---
 name: qa-scan
-description: "QA automation: analyze issue → scout code → generate + run Playwright E2E test → adversarial verification → structured VERDICT report"
-version: 1.0.0
-argument-hint: "<issue-id-or-url> [--repo <repo-key>]"
+description: "QA automation with status protocol: analyze → scout → generate → run → verify → report. Supports user escalation and retry logic."
+version: 2.0.0
+argument-hint: "<issue-id-or-url> [--repo <repo-key>] [--interactive] [--all]"
 ---
 
 # QA Scan
 
-Automated QA workflow with adversarial verification.
+Automated QA with **status protocol** for user escalation and retry handling.
 
 Load: `.agents/qa-scan/workflow.md`
 
+## Usage
+
+```
+/qa-scan SKI-101                    # Single issue (auto mode)
+/qa-scan SKI-101 --interactive      # Step-by-step confirmation
+/qa-scan --all                      # Batch: all QA issues
+```
+
+## Status Protocol
+
+Agents return: `DONE` | `DONE_WITH_CONCERNS` | `BLOCKED` | `NEEDS_CONTEXT`
+
+- **BLOCKED/NEEDS_CONTEXT** → User escalation
+- **3x retry limit** → Then escalate
+- **Interactive mode** → Confirm each step
+
 ## Quick Reference
 - Config: `.agents/qa-scan/config/qa.config.yaml`
-- Prompts: `.agents/qa-scan/references/`
+- Prompts: `references/` (synced to workspace root)
 - Evidence: `.agents/qa-scan/evidence/`
+- Status Protocol: `references/status-protocol.md`
 - Setup: `bash .agents/qa-scan/scripts/install.sh`
 - Verify: `bash .agents/qa-scan/scripts/verify.sh`
+
+## For Non-Claude Agents
+Gemini/Antigravity: use `.agents/qa-scan/workflow.md` (prompt-based)
 CLAUDE_ADAPTER
 
 # Gemini CLI — install agents natively
@@ -54,6 +74,14 @@ for agent_file in agents/qa-*.md; do
   [ -f "$agent_file" ] && cp "$agent_file" "$WORKSPACE/.gemini/agents/"
 done
 echo "  Agents installed to .gemini/agents/"
+
+# Gemini CLI — install slash commands
+echo "→ Installing Gemini slash commands..."
+mkdir -p "$WORKSPACE/.gemini/commands"
+for cmd_file in commands/*.toml; do
+  [ -f "$cmd_file" ] && cp "$cmd_file" "$WORKSPACE/.gemini/commands/"
+done
+echo "  Commands installed to .gemini/commands/"
 
 # Antigravity adapter
 mkdir -p "$WORKSPACE/.antigravity"
@@ -84,9 +112,17 @@ for agent_file in agents/qa-*.md; do
 done
 echo "  Agents installed to .claude/agents/"
 
+# 6. Sync references to workspace root (agents reference these)
+echo "→ Syncing references..."
+mkdir -p "$WORKSPACE/references"
+cp references/*.md "$WORKSPACE/references/" 2>/dev/null || true
+echo "  References synced to workspace root"
+
 echo ""
 echo "✓ QA Scan installed successfully."
-echo "  Claude agents: .claude/agents/qa-*.md"
-echo "  Gemini agents: .gemini/agents/qa-*.md"
-echo "  Antigravity:   .antigravity/qa-scan.md (workflow.md fallback)"
+echo "  Claude skill:    /qa-scan via .claude/skills/qa-scan/"
+echo "  Claude agents:   .claude/agents/qa-*.md"
+echo "  Gemini command:  /qa-scan via .gemini/commands/qa-scan.toml"
+echo "  Gemini agents:   .gemini/agents/qa-*.md"
+echo "  Antigravity:     .antigravity/qa-scan.md (workflow.md fallback)"
 echo "  Run: bash .agents/qa-scan/scripts/verify.sh"

@@ -1,0 +1,28 @@
+# QA Scan - Gemini CLI Slash Command
+# Usage: /qa-scan <issue-id>  or  /qa-scan --all
+
+description = "Run QA scan pipeline for Linear/GitHub issues"
+
+prompt = """
+You are the qa-orchestrator agent. Execute the full QA pipeline.
+
+## Input
+Issue or command: ``
+
+## Configuration
+Read: .agents/qa-scan/config/qa.config.yaml
+
+## Workflow
+Follow the pipeline in .agents/qa-scan/workflow.md
+
+## Agent Instructions
+@{.gemini/agents/qa-orchestrator.md}
+
+## Arguments
+- Single issue: `/qa-scan SKI-101` or `/qa-scan SKIN-101`
+- Batch mode: `/qa-scan --all`
+- With repo filter: `/qa-scan --all --repo skin-agent-fe`
+- Post report: `/qa-scan SKI-101 --post`
+
+Execute the pipeline now.
+"""

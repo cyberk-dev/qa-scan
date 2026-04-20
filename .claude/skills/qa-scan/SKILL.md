@@ -1,45 +1,39 @@
 ---
 name: qa-scan
-description: "QA automation: multi-agent pipeline with enforced tool restrictions. Analyze issue → scout → analyze flow → generate test → run → coverage verify → VERDICT report"
-version: 3.0.0
-argument-hint: "<issue-id-or-url> [--repo <repo-key>] [--all] [--post]"
+description: "QA automation with status protocol: analyze → scout → generate → run → verify → report. Supports user escalation and retry logic."
+version: 2.0.0
+argument-hint: "<issue-id-or-url> [--repo <repo-key>] [--interactive] [--all]"
 ---
 
 # QA Scan
 
-Automated QA with **enforced multi-agent pipeline**. Each sub-agent has restricted tool access.
+Automated QA with **status protocol** for user escalation and retry handling.
 
-## Quick Start
+Load: `.agents/qa-scan/workflow.md`
+
+## Usage
+
 ```
-/qa-scan SKIN-101              # Single issue
-/qa-scan --all                 # All QA issues (batch)
-/qa-scan SKIN-101 --post       # Single + post report to Linear
+/qa-scan SKI-101                    # Single issue (auto mode)
+/qa-scan SKI-101 --interactive      # Step-by-step confirmation
+/qa-scan --all                      # Batch: all QA issues
 ```
 
-## How It Works
+## Status Protocol
 
-Spawns `qa-orchestrator` agent which coordinates 7 sub-agents in the main pipeline:
+Agents return: `DONE` | `DONE_WITH_CONCERNS` | `BLOCKED` | `NEEDS_CONTEXT`
 
-| # | Agent | Restriction | Role |
-|---|-------|------------|------|
-| 1 | qa-issue-analyzer | Read-only | Extract test requirements from issue |
-| 2 | qa-code-scout | Read-only | Find relevant code files |
-| 2b | qa-flow-analyzer | Read-only | Analyze code → extract states/branches → test matrix |
-| 3 | qa-test-generator | Write evidence/ only | Generate Playwright tests from matrix |
-| 4 | qa-test-runner | Bash only | Execute tests + capture video |
-| 5 | qa-coverage-verifier | Read-only + background | Verify test coverage completeness |
-| 6 | qa-report-synthesizer | Write report only | VERDICT: PASS/FAIL/PARTIAL |
+- **BLOCKED/NEEDS_CONTEXT** → User escalation
+- **3x retry limit** → Then escalate
+- **Interactive mode** → Confirm each step
 
-> `qa-adversarial-verifier` is kept for backward compat (Gemini/Antigravity via workflow.md).
-
-**Key improvement (v3):** Flow analyzer reads actual code to build a test coverage matrix (states, branches, actions). Test-generator creates tests for EVERY state, not just issue description. Coverage verifier checks completeness against the matrix.
-
-## Configuration
+## Quick Reference
 - Config: `.agents/qa-scan/config/qa.config.yaml`
-- Prompts: `.agents/qa-scan/references/`
+- Prompts: `references/` (synced to workspace root)
 - Evidence: `.agents/qa-scan/evidence/`
+- Status Protocol: `references/status-protocol.md`
 - Setup: `bash .agents/qa-scan/scripts/install.sh`
 - Verify: `bash .agents/qa-scan/scripts/verify.sh`
 
 ## For Non-Claude Agents
-Gemini/Antigravity: use `.agents/qa-scan/workflow.md` (prompt-based, no enforcement)
+Gemini/Antigravity: use `.agents/qa-scan/workflow.md` (prompt-based)

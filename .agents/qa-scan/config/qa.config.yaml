@@ -10,6 +10,18 @@ defaults:
   self_healing_retries: 1         # Retry with DOM snapshot if test fails on selector
 
 repos:
+  test-app:
+    path: ../test-app
+    base_url: http://localhost:3002
+    dev_command: bun run server.ts
+    source: linear
+    project_key: SKI
+    branch: main
+    gitnexus: true
+    state_filter: "In Review"
+    auth:
+      strategy: skip
+
   skin-agent-fe:
     path: ../skin-agent-fe
     base_url: http://localhost:3001

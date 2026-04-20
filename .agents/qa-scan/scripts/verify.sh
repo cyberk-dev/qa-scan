@@ -25,8 +25,15 @@ echo "--- Config ---"
 # Prompt references
 echo ""
 echo "--- Prompts ---"
-for prompt in analyze-issue analyze-flow generate-test scout-code adversarial-verifier coverage-verifier synthesize-report adversarial-probes verdict-rules; do
+for prompt in analyze-issue analyze-flow generate-test scout-code adversarial-verifier coverage-verifier synthesize-report adversarial-probes verdict-rules status-protocol project-context gitnexus-flows mcp-diagnostics; do
   [ -f "$AGENTS_DIR/references/$prompt.md" ] && echo "✓ $prompt.md" || { echo "✗ $prompt.md missing"; ERRORS=$((ERRORS+1)); }
+done
+
+# Workspace references (synced by install.sh)
+echo ""
+echo "--- Workspace Refs ---"
+for ref in status-protocol project-context gitnexus-flows mcp-diagnostics; do
+  [ -f "$WORKSPACE/references/$ref.md" ] && echo "✓ $ref.md (synced)" || { echo "⚠ $ref.md not synced (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
 done
 
 # Agent adapters
@@ -38,16 +45,21 @@ echo "--- Adapters ---"
 # Claude agents
 echo ""
 echo "--- Claude Agents ---"
-for agent in qa-orchestrator qa-issue-analyzer qa-code-scout qa-flow-analyzer qa-test-generator qa-test-runner qa-adversarial-verifier qa-coverage-verifier qa-report-synthesizer; do
+for agent in qa-orchestrator qa-issue-analyzer qa-code-scout qa-flow-analyzer qa-test-generator qa-test-runner qa-adversarial-verifier qa-coverage-verifier qa-report-synthesizer qa-context-extractor; do
   [ -f "$WORKSPACE/.claude/agents/$agent.md" ] && echo "✓ $agent" || { echo "⚠ $agent missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
 done
 
 # Gemini agents
 echo ""
 echo "--- Gemini Agents ---"
-for agent in qa-orchestrator qa-issue-analyzer qa-code-scout qa-flow-analyzer qa-test-generator qa-test-runner qa-adversarial-verifier qa-coverage-verifier qa-report-synthesizer; do
+for agent in qa-orchestrator qa-issue-analyzer qa-code-scout qa-flow-analyzer qa-test-generator qa-test-runner qa-adversarial-verifier qa-coverage-verifier qa-report-synthesizer qa-context-extractor; do
   [ -f "$WORKSPACE/.gemini/agents/$agent.md" ] && echo "✓ $agent (gemini)" || { echo "⚠ $agent missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
 done
+
+# Gemini slash commands
+echo ""
+echo "--- Gemini Commands ---"
+[ -f "$WORKSPACE/.gemini/commands/qa-scan.toml" ] && echo "✓ /qa-scan (gemini)" || { echo "⚠ /qa-scan missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
 
 # Orchestrator script
 echo ""

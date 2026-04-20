@@ -2,13 +2,15 @@
 
 > **Claude Code / Gemini CLI:** Use native agents in `.claude/agents/` or `.gemini/agents/` (auto-installed by `install.sh`). This workflow.md serves as documentation reference and fallback for agents without native agent support (e.g., Antigravity).
 
-Automated QA pipeline: analyze issue → scout code → analyze flow → generate test → run → verify coverage → structured report.
+Automated QA pipeline with **status protocol** for user escalation and retry handling.
 
 ## Usage
 
 ```
-qa-scan <issue-id-or-url> [--repo <repo-key>]    # Single issue
-qa-scan --all [--repo <repo-key>]                 # Batch: all QA issues
+qa-scan <issue-id-or-url> [--repo <repo-key>]           # Single issue (auto mode)
+qa-scan <issue-id-or-url> --interactive                  # Step-by-step confirmation
+qa-scan --all [--repo <repo-key>]                        # Batch: all QA issues
+qa-scan --all --interactive                              # Batch with per-issue confirmation
 ```
 
 **Arguments:**
@@ -16,6 +18,62 @@ qa-scan --all [--repo <repo-key>]                 # Batch: all QA issues
 - `--all`: Fetch ALL issues in QA status and run pipeline for each
 - `--repo`: Override/filter repo key from `config/qa.config.yaml`
 - `--post`: Auto-post report to issue after scan
+- `--interactive`: Enable step-by-step confirmation mode
+
+---
+
+## Status Protocol
+
+All sub-agents report one of these statuses (see `references/status-protocol.md`):
+
+| Status | Meaning | Orchestrator Action |
+|--------|---------|---------------------|
+| `DONE` | Completed successfully | Proceed to next step |
+| `DONE_WITH_CONCERNS` | Completed with flags | Log concern, proceed (or pause if `[correctness]`) |
+| `BLOCKED` | Cannot proceed | Escalate to user |
+| `NEEDS_CONTEXT` | Missing info | Ask user, retry (max 3x) |
+
+### Escalation Ladder (BLOCKED)
+
+When an agent returns BLOCKED:
+1. **More context** → Ask user for additional info
+2. **Simpler task** → Decompose into smaller steps
+3. **Skip step** → Mark as PARTIAL, continue
+4. **Abort** → Stop entire scan
+
+### Retry Logic
+
+- Max 3 retries per step for NEEDS_CONTEXT
+- Context REPLACED on retry (not accumulated)
+- After 3 failures → escalate as BLOCKED
+
+---
+
+## Interactive Mode (`--interactive`)
+
+Step-by-step confirmation for careful QA:
+
+| Status | Auto Mode | Interactive Mode |
+|--------|-----------|------------------|
+| DONE | Auto-proceed | Show summary, ask "Continue? [Y/n]" |
+| DONE_WITH_CONCERNS | Log, proceed | Show concerns, ask "Continue anyway? [Y/n/review]" |
+| BLOCKED | Escalate | Escalate (same) |
+| NEEDS_CONTEXT | Ask user | Ask user (same) |
+
+### CLI Fallback
+
+If `AskUserQuestion` tool unavailable (CLI mode):
+```
+Step 1: Analyze Issue ✓
+
+Status: DONE
+Summary: Extracted 3 test scenarios for login flow
+Confidence: 0.85
+
+Continue? [Y/n/review]:
+```
+
+User replies with: `y`, `n`, or `review` in next message
 
 **Prerequisites:**
 - Target app dev server running at configured `base_url`
@@ -31,9 +89,19 @@ Scans all issues currently in QA status:
    - Linear: `linear_listIssues({filter: {state: {name: {eq: "QA"}}, project: {key: {eq: "SKIN"}}}})` 
    - GitHub: `gh issue list --label "QA" --state open --repo org/repo`
 
-2. **For each issue:** Run full 8-step pipeline (Steps 1-8)
+2. **For each issue:** Run full pipeline with status handling
 
-3. **Generate batch summary report** → `evidence/batch-{date}/summary.md`:
+3. **Aggregate verdicts:**
+
+| Issue Results | Batch Verdict |
+|--------------|---------------|
+| All DONE | PASS |
+| Any DONE_WITH_CONCERNS, no BLOCKED | PARTIAL |
+| Any BLOCKED (skipped) | PARTIAL |
+| Any BLOCKED (aborted) | ABORTED |
+| Mix of PASS/FAIL verdicts | Report counts |
+
+4. **Generate batch summary report** → `evidence/batch-{date}/summary.md`:
    ```markdown
    # QA Batch Report — {date}
    
@@ -57,7 +125,31 @@ Scans all issues currently in QA status:
 
 ---
 
-## Pipeline (8 Steps)
+## Pipeline (9 Steps)
+
+### Step -1 — Pre-flight Check (MANDATORY)
+
+Before starting, verify required tools are available:
+
+| Tool | Check | Required | Fallback |
+|------|-------|----------|----------|
+| Linear MCP | `mcp__linear__list_teams()` | ✓ Yes | Manual issue input |
+| GitNexus MCP | `mcp__gitnexus__list_repos()` | Optional | Pattern-based scout |
+| Playwright | `npx playwright --version` | ✓ Yes | Skip tests (PARTIAL) |
+
+**If any required tool fails:**
+1. Show error to user with options
+2. User chooses: Fix / Workaround / Abort
+3. If Abort → VERDICT = ABORTED
+
+**Example error handling:**
+```
+Pre-flight: Linear MCP not responding
+Options:
+  1. Help me start Linear MCP
+  2. I'll paste issue details manually
+  3. Abort scan
+```
 
 ### Step 0 — Project Context + Server Health (Claude agents: automatic)
 
@@ -108,6 +200,35 @@ Feed issue title + description to LLM with the analyze-issue prompt.
 - `confidence`: 0-1 how clear the requirements are
 
 If confidence < 0.5 → warn user, suggest manual testing.
+
+### Step 1c — Xác Nhận Phân Tích (Vietnamese)
+
+Present extracted results to user for confirmation:
+
+```
+📋 KẾT QUẢ PHÂN TÍCH ISSUE
+
+Issue: SKI-101 - Fix login redirect
+Nguồn: Linear
+
+TÍNH NĂNG: Authentication
+KỊCH BẢN TEST:
+1. Đăng nhập thành công → redirect dashboard
+2. Sai password → hiển thị lỗi
+3. Để trống fields → validation error
+
+ĐỘ TIN CẬY: 85%
+
+XÁC NHẬN:
+1. ✓ Đúng rồi, tiếp tục
+2. ✏️ Cần chỉnh sửa
+3. ✕ Hủy scan
+```
+
+- **Auto mode + confidence >= 0.8:** Skip confirmation
+- **Interactive mode:** Always confirm
+- User chọn 2 → Nhập chỉnh sửa → Re-confirm
+- User chọn 3 → VERDICT = ABORTED
 
 ### Step 2 — Scout Code
 
