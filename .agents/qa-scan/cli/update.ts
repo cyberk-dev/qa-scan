@@ -4,7 +4,7 @@ import { syncAgents, syncCommands, syncReferences, writeSkill, writeAntigravity 
 
 export async function update() {
   const agentsDir = dirname(import.meta.dir);
-  const workspace = dirname(dirname(dirname(agentsDir)));
+  const workspace = dirname(dirname(agentsDir));
 
   // Check if installed
   const installedVersionFile = join(agentsDir, '.installed-version');

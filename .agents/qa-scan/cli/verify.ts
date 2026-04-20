@@ -4,7 +4,7 @@ import { $ } from 'bun';
 
 export async function verify() {
   const agentsDir = dirname(import.meta.dir);
-  const workspace = dirname(dirname(dirname(agentsDir)));
+  const workspace = dirname(dirname(agentsDir));
 
   let errors = 0;
   let warnings = 0;

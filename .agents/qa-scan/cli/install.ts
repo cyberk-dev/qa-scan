@@ -5,7 +5,7 @@ import { syncAgents, syncCommands, syncReferences, writeSkill, writeAntigravity 
 
 export async function install() {
   const agentsDir = dirname(import.meta.dir);
-  const workspace = dirname(dirname(dirname(agentsDir)));
+  const workspace = dirname(dirname(agentsDir));
 
   console.log('=== QA Scan Setup ===\n');
 
