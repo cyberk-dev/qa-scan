@@ -5,7 +5,7 @@ defaults:
   video: true
   trace: true
   screenshots: true
-  evidence_dir: ./evidence
+  results_dir: ../../qa-results   # Common folder outside qa-scan-repo (workspace level)
   selectors: accessibility-first  # getByRole > getByLabel > getByText > getByTestId
   self_healing_retries: 1         # Retry with DOM snapshot if test fails on selector
 

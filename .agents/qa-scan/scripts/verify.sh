@@ -65,13 +65,15 @@ echo "--- Gemini Commands ---"
 echo ""
 echo "--- Zero-Touch ---"
 [ -f "$AGENTS_DIR/scripts/qa-orchestrator.sh" ] && echo "✓ qa-orchestrator.sh" || { echo "✗ qa-orchestrator.sh missing"; ERRORS=$((ERRORS+1)); }
-[ -f "$AGENTS_DIR/evidence/qa-tracker.json" ] && echo "✓ qa-tracker.json" || { echo "Warning: qa-tracker.json missing (will be created on first run)"; WARNINGS=$((WARNINGS+1)); }
-[ -f "$AGENTS_DIR/evidence/hotspot-memory.json" ] && echo "✓ hotspot-memory.json" || { echo "Warning: hotspot-memory.json missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
 
-# Evidence dir
+# Common results folder (workspace level)
+QA_RESULTS="$WORKSPACE/qa-results"
 echo ""
-echo "--- Evidence ---"
-[ -d "$AGENTS_DIR/evidence" ] && echo "✓ evidence/" || { echo "✗ evidence/ missing"; ERRORS=$((ERRORS+1)); }
+echo "--- Results Folder ---"
+[ -d "$QA_RESULTS" ] && echo "✓ qa-results/" || { echo "✗ qa-results/ missing (run install.sh)"; ERRORS=$((ERRORS+1)); }
+[ -f "$QA_RESULTS/qa-tracker.json" ] && echo "✓ qa-tracker.json" || { echo "⚠ qa-tracker.json missing (will be created on first run)"; WARNINGS=$((WARNINGS+1)); }
+[ -f "$QA_RESULTS/hotspot-memory.json" ] && echo "✓ hotspot-memory.json" || { echo "⚠ hotspot-memory.json missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
+[ -f "$QA_RESULTS/flaky-memory.json" ] && echo "✓ flaky-memory.json" || { echo "⚠ flaky-memory.json missing (run install.sh)"; WARNINGS=$((WARNINGS+1)); }
 
 # Summary
 echo ""

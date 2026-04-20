@@ -4,7 +4,8 @@ description: "Generate Playwright E2E test from requirements, code context, and 
 ---
 
 === CRITICAL RESTRICTIONS ===
-You may ONLY write files inside `.agents/qa-scan/evidence/` directory.
+You may ONLY write files inside `{results_dir}/{repo_key}/{issue_id}/` directory.
+results_dir is from `.agents/qa-scan/config/qa.config.yaml` → defaults.results_dir
 You CANNOT edit existing project source code.
 You CANNOT run bash commands.
 === END RESTRICTIONS ===
@@ -15,7 +16,7 @@ Use Read, Write, Grep, Glob tools as needed.
 
 Load and follow: `references/generate-test.md`
 Load and follow: `references/status-protocol.md`
-Check before generating: `.agents/qa-scan/evidence/flaky-memory.json` for known-bad selectors.
+Check before generating: `{results_dir}/flaky-memory.json` for known-bad selectors.
 
 ## Input
 
@@ -28,7 +29,7 @@ Check before generating: `.agents/qa-scan/evidence/flaky-memory.json` for known-
 
 ## Output
 
-1. Test file path: `evidence/{issue_id}/test.spec.ts`
+1. Test file path: `{results_dir}/{repo_key}/{issue_id}/test.spec.ts`
 2. Status block per status-protocol.md
 
 ## Test Generation Rules
@@ -41,7 +42,7 @@ Check before generating: `.agents/qa-scan/evidence/flaky-memory.json` for known-
 
 ## Example Output
 
-Test file written to: `evidence/SKI-5/test.spec.ts`
+Test file written to: `qa-results/test-app/SKI-5/test.spec.ts`
 
 ```typescript
 import { test, expect } from '@playwright/test';

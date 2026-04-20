@@ -1,8 +1,14 @@
 import { defineConfig } from '@playwright/test';
 
+// Results dir from qa.config.yaml → defaults.results_dir
+// Env var QA_RESULTS_DIR set by orchestrator at runtime
+const resultsDir = process.env.QA_RESULTS_DIR || '../../qa-results';
+const repoKey = process.env.QA_REPO_KEY || 'default';
+const issueId = process.env.QA_ISSUE_ID || 'test';
+
 export default defineConfig({
-  testDir: '../evidence',
-  outputDir: '../evidence/results',
+  testDir: `${resultsDir}/${repoKey}/${issueId}`,
+  outputDir: `${resultsDir}/${repoKey}/${issueId}/results`,
 
   // Auth: global setup runs login + saves storage state (if configured)
   globalSetup: process.env.QA_AUTH_STRATEGY === 'storage-state'
@@ -23,7 +29,7 @@ export default defineConfig({
   },
 
   reporter: [
-    ['json', { outputFile: '../evidence/results.json' }],
-    ['html', { open: 'never', outputFolder: '../evidence/html-report' }],
+    ['json', { outputFile: `${resultsDir}/${repoKey}/${issueId}/results.json` }],
+    ['html', { open: 'never', outputFolder: `${resultsDir}/${repoKey}/${issueId}/html-report` }],
   ],
 });

@@ -14,11 +14,13 @@ echo "→ Installing Playwright..."
 bun install
 npx playwright install chromium
 
-# 2. Create evidence dir + hotspot memory
-mkdir -p evidence/logs
-[ -f evidence/hotspot-memory.json ] || echo "[]" > evidence/hotspot-memory.json
-[ -f evidence/qa-tracker.json ] || echo "[]" > evidence/qa-tracker.json
-[ -f evidence/flaky-memory.json ] || echo "[]" > evidence/flaky-memory.json
+# 2. Create common qa-results folder (workspace level)
+QA_RESULTS="$WORKSPACE/qa-results"
+mkdir -p "$QA_RESULTS"
+[ -f "$QA_RESULTS/qa-tracker.json" ] || echo "[]" > "$QA_RESULTS/qa-tracker.json"
+[ -f "$QA_RESULTS/hotspot-memory.json" ] || echo "[]" > "$QA_RESULTS/hotspot-memory.json"
+[ -f "$QA_RESULTS/flaky-memory.json" ] || echo "[]" > "$QA_RESULTS/flaky-memory.json"
+echo "  Results folder: $QA_RESULTS"
 
 # 3. Create thin adapters for all 3 agent systems
 echo "→ Creating agent adapters..."
@@ -58,7 +60,7 @@ Agents return: `DONE` | `DONE_WITH_CONCERNS` | `BLOCKED` | `NEEDS_CONTEXT`
 ## Quick Reference
 - Config: `.agents/qa-scan/config/qa.config.yaml`
 - Prompts: `references/` (synced to workspace root)
-- Evidence: `.agents/qa-scan/evidence/`
+- Results: `qa-results/{repo}/{issue}/` (workspace level)
 - Status Protocol: `references/status-protocol.md`
 - Setup: `bash .agents/qa-scan/scripts/install.sh`
 - Verify: `bash .agents/qa-scan/scripts/verify.sh`
@@ -94,7 +96,7 @@ Automated QA workflow: analyze issue → scout code → generate E2E test → ru
 - Workflow: `.agents/qa-scan/workflow.md`
 - Prompts: `.agents/qa-scan/references/`
 - Config: `.agents/qa-scan/config/qa.config.yaml`
-- Evidence: `.agents/qa-scan/evidence/`
+- Results: `qa-results/{repo}/{issue}/` (workspace level)
 
 ## Usage
 ```
@@ -125,4 +127,5 @@ echo "  Claude agents:   .claude/agents/qa-*.md"
 echo "  Gemini command:  /qa-scan via .gemini/commands/qa-scan.toml"
 echo "  Gemini agents:   .gemini/agents/qa-*.md"
 echo "  Antigravity:     .antigravity/qa-scan.md (workflow.md fallback)"
+echo "  Results:         $QA_RESULTS/{repo}/{issue}/"
 echo "  Run: bash .agents/qa-scan/scripts/verify.sh"

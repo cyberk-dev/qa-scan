@@ -21,7 +21,7 @@ Load and follow: `references/status-protocol.md`
 cd {repo_path} && QA_BASE_URL={base_url} npx playwright test {test_path} --config={playwright_config}
 ```
 
-Read results from `evidence/results.json`.
+Read results from `{results_dir}/{repo_key}/{issue_id}/results.json`.
 
 ## Output
 
@@ -38,8 +38,8 @@ Read results from `evidence/results.json`.
   "passed": 3,
   "failed": 0,
   "artifacts": {
-    "video": "evidence/SKI-5/video.webm",
-    "trace": "evidence/SKI-5/trace.zip"
+    "video": "qa-results/test-app/SKI-5/video.webm",
+    "trace": "qa-results/test-app/SKI-5/trace.zip"
   }
 }
 ```
