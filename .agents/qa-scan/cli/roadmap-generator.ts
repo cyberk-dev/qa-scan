@@ -1,6 +1,7 @@
 import type { RepoConfig } from './config';
 import type { DomainResult, Capability } from './domain-detector';
 import type { CriticalFlow } from './flow-extractor';
+import { getFlowFixtures, getFixtureDefinitions, type FixtureDefinition, type SetupAction } from './fixture-registry';
 
 export interface TestEnvironment {
   type: string;
@@ -19,6 +20,8 @@ export interface FlowSpec {
   states: string[];
   dependencies: string[];
   suggested_tests: string[];
+  required_fixtures: string[];
+  setup_actions: SetupAction[];
 }
 
 export interface TestRoadmap {
@@ -31,6 +34,7 @@ export interface TestRoadmap {
   critical_flows: FlowSpec[];
   test_environment: TestEnvironment;
   coverage_gaps: string[];
+  fixture_definitions: Record<string, FixtureDefinition>;
 }
 
 const WEB3_TEST_ACCOUNTS = {
@@ -128,6 +132,24 @@ export function generateRoadmap(
   const repoPath = `${workspace}/${repo.path}`;
   const commit = getGitHead(repoPath);
 
+  const allFixtures = new Set<string>();
+
+  const flowSpecs = flows.map(f => {
+    const fixtureMapping = getFlowFixtures(domain.domain, f.name);
+    const required_fixtures = fixtureMapping?.fixtures || [];
+    const setup_actions = fixtureMapping?.setup_actions || [];
+
+    required_fixtures.forEach(fix => allFixtures.add(fix));
+
+    return {
+      ...f,
+      test_priority: f.priority,
+      suggested_tests: generateTestSuggestions(f, domain),
+      required_fixtures,
+      setup_actions,
+    };
+  });
+
   return {
     project: repo.key,
     analyzed_at: new Date().toISOString(),
@@ -135,12 +157,9 @@ export function generateRoadmap(
     domain: domain.domain,
     confidence: domain.confidence,
     capabilities: domain.capabilities,
-    critical_flows: flows.map(f => ({
-      ...f,
-      test_priority: f.priority,
-      suggested_tests: generateTestSuggestions(f, domain),
-    })),
+    critical_flows: flowSpecs,
     test_environment: buildTestEnvironment(domain),
     coverage_gaps: identifyCoverageGaps(flows),
+    fixture_definitions: getFixtureDefinitions([...allFixtures]),
   };
 }

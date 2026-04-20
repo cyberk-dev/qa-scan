@@ -25,6 +25,8 @@ Check before generating: `.agents/qa-scan/evidence/flaky-memory.json` for known-
 - base_url: Test server URL
 - issue_id: Issue ID for evidence folder
 - project_context: Tech stack, test framework
+- fixture_definitions: Required fixtures from test-roadmap.json (optional)
+- required_fixtures: List of fixture names for this flow (optional)
 
 ## Output
 
@@ -38,6 +40,44 @@ Check before generating: `.agents/qa-scan/evidence/flaky-memory.json` for known-
 - Use project_context.test_framework syntax
 - Avoid selectors in flaky-memory.json
 - Include video/trace capture
+
+## Fixture Injection Rules
+
+When `required_fixtures` is provided, auto-inject fixture setup:
+
+1. **Web3 fixtures** (wallet, anvil):
+```typescript
+import { test, expect } from '.agents/qa-scan/fixtures/web3';
+
+let snapshotId: `0x${string}`;
+test.beforeAll(async ({ anvil }) => { snapshotId = await anvil.snapshot(); });
+test.afterAll(async ({ anvil }) => { if (snapshotId) await anvil.revert({ id: snapshotId }); });
+
+test('wallet flow', async ({ page, wallet, anvil }) => {
+  await wallet.connect('alice');
+  // test code
+});
+```
+
+2. **Fintech fixtures** (stripe):
+```typescript
+import { test, expect } from '.agents/qa-scan/fixtures/fintech';
+
+test('payment flow', async ({ page, stripe }) => {
+  const intent = await stripe.createPaymentIntent(1000);
+  // test code
+});
+```
+
+3. **SaaS fixtures** (oauth):
+```typescript
+import { test, expect } from '.agents/qa-scan/fixtures/saas';
+
+test('auth flow', async ({ page, oauth }) => {
+  await oauth.injectMockUser({ id: '1', email: 'test@example.com', name: 'Test' });
+  // test code
+});
+```
 
 ## Example Output
 
