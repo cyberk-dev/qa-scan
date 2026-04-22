@@ -50,3 +50,22 @@ Issue identifier → repo matching:
 2. `org/repo#42` → scan all repos for `repo: org/repo`
 3. `--repo <key>` → direct key lookup (overrides auto-detect)
 4. URL → parse domain (linear.app/github.com) then match
+
+---
+
+## Repo Manifest (`.qa-scan.yaml`) — v4+
+
+Optional file in target repo root. Overrides auto-detect for env bootstrap (Step 0a).
+
+Full schema: see `references/env-bootstrap.md` → "Manifest Schema" section.
+
+Minimal example:
+```yaml
+dev:
+  command: bun dev
+  port: 3000
+  health_path: /api/health
+env:
+  file: .env.local
+  required: [DATABASE_URL]
+```

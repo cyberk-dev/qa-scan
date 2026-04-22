@@ -260,12 +260,21 @@ Store in `report_state.project_context` — pass to ALL subsequent agents.
 - NEEDS_CONTEXT: Ask user for README or key info
 - BLOCKED: Escalate (cannot proceed without basic project info)
 
-### Step 0b: Server Health Check
+### Step 0a: Env Bootstrap (NEW in v4)
 
-Use `WebFetch({url: base_url})` to check server status.
-- If success (HTTP 200): Continue
-- If fail: Spawn `qa-test-runner` to auto-start using `dev_command`
-- If still fail after 30s: BLOCKED → escalate to user
+Spawn agent: `qa-env-bootstrap`
+Input: repo_path, repo_key, manifest_path (optional `.qa-scan.yaml`), results_dir, project_context
+Output: `{base_url, server_pid, service_pids, env_file, cleanup_hook, diagnostics}`
+
+Agent handles: stack detection → install deps → setup .env → start services → kill port occupant → spawn dev server → wait-for-ready.
+
+**Register cleanup** — call on scan end to kill dev server pid. Docker services persist.
+
+**Status handling:**
+- DONE: Store `base_url` + cleanup hook; continue
+- BLOCKED: T4 template (monorepo-no-manifest / install-fail / services-timeout / port-no-kill / server-crash)
+
+See `references/env-bootstrap.md`.
 
 ### Step 1: Analyze Issue
 
