@@ -76,22 +76,119 @@ Polls Linear every 10 minutes. Auto-tests new QA issues. Posts results + labels.
 
 ## How It Works
 
-### Pipeline (v3)
+### Pipeline (v4)
 
 ```
-Step 0: Project context + dev server health check
-Step 1: Fetch + analyze issue → test requirements
-Step 2: Scout code → find relevant files (GitNexus if available)
-Step 2b: Analyze flow → read code, extract states/branches → test matrix
-Step 3: Generate test → Playwright E2E from matrix + issue scenarios
-Step 4: Run test → execute + capture video/trace/screenshots
-Step 5: Coverage verification → compare tests vs flow matrix
-Step 6: Synthesize report → VERDICT: PASS/FAIL/PARTIAL
-Step 7: Post results → comment + label on Linear/GitHub
-Step 8: Update hotspot memory → track buggy files for future runs
+Step -1: Pre-flight (Linear/GitNexus/Playwright MCP checks)
+Step 0:  Project context (qa-context-extractor)
+Step 0a: Env bootstrap ⭐NEW — install deps, setup .env, start services, spawn dev server
+Step 1:  Fetch + analyze issue → test requirements (+VI confirm Step 1c)
+Step 1d: GitNexus index
+Step 2:  Scout + flow + routes + shapes ⭐MERGED — unified test matrix
+Step 3:  Generate test → Playwright E2E
+Step 4:  Run test → video/trace/screenshots
+Step 5:  Coverage / adversarial verify
+Step 6:  Synthesize report → VERDICT: PASS/FAIL/PARTIAL
+Step 7:  Post results (--post) → Linear/GitHub comment + label
+Step 8:  Update hotspot memory
 ```
 
-**Key:** Step 2b reads actual source code to extract every testable state (loading, error, empty, auth, success). Tests are generated for ALL states, not just what the issue describes. Coverage verifier checks completeness against the matrix.
+**Key v4 changes:** Step 0a auto-bootstraps env (deps + services + dev server) so zero-config install works on fresh machines. Step 2 unified — qa-code-scout produces files + flows + routes + shapes + test matrix in one pass (former qa-flow-analyzer merged in).
+
+### Flow Diagrams
+
+#### D1 — Pipeline Flowchart
+
+```mermaid
+flowchart TD
+    Start([/qa-scan SKIN-101]) --> S_1[Step -1: Pre-flight<br/>Linear/GitNexus/Playwright]
+    S_1 --> S0[Step 0: Project Context<br/>qa-context-extractor]
+    S0 --> S0a[Step 0a: Env Bootstrap ⭐NEW<br/>qa-env-bootstrap]
+    S0a --> S1[Step 1: Fetch Issue<br/>qa-issue-analyzer]
+    S1 --> S1c{Confidence ≥ 0.8?}
+    S1c -->|No| S1cV[Step 1c: VI Confirm<br/>AskUserQuestion]
+    S1c -->|Yes or --auto| S1d
+    S1cV --> S1d[Step 1d: GitNexus Index]
+    S1d --> S2[Step 2: Scout + Flow ⭐MERGED<br/>qa-code-scout]
+    S2 --> S3[Step 3: Generate Test<br/>qa-test-generator]
+    S3 --> S4[Step 4: Run Test<br/>qa-test-runner]
+    S4 --> S5[Step 5: Verify<br/>qa-coverage-verifier]
+    S5 --> S6[Step 6: Synthesize Report<br/>qa-report-synthesizer]
+    S6 --> S7{--post?}
+    S7 -->|Yes| S7a[Step 7: Post Linear/GH]
+    S7 -->|No| S8
+    S7a --> S8[Step 8: Hotspot Memory]
+    S8 --> End([VERDICT: PASS/FAIL/PARTIAL])
+
+    style S0a fill:#90EE90
+    style S2 fill:#87CEEB
+```
+
+#### D2 — Escalation State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> AgentRunning
+    AgentRunning --> ParseStatus: returns
+    ParseStatus --> DONE
+    ParseStatus --> CONCERNS_obs: DONE_WITH_CONCERNS[observational]
+    ParseStatus --> CONCERNS_corr: DONE_WITH_CONCERNS[correctness]
+    ParseStatus --> BLOCKED
+    ParseStatus --> NEEDS_CONTEXT
+    DONE --> NextStep
+    CONCERNS_obs --> LogConcern
+    LogConcern --> NextStep
+    CONCERNS_corr --> Diagnose
+    BLOCKED --> Diagnose
+    NEEDS_CONTEXT --> Diagnose
+    Diagnose --> AutoFix: max 3 attempts
+    AutoFix --> Verify
+    Verify --> NextStep: fixed
+    Verify --> VIPrompt: not fixed
+    VIPrompt --> UserChoice: Template T1-T7
+    UserChoice --> Retry: fix chosen
+    UserChoice --> Skip: workaround → PARTIAL
+    UserChoice --> Abort: VERDICT=ABORTED
+    Retry --> AgentRunning: retry++
+    Retry --> Abort: retry ≥ 3
+    NextStep --> [*]
+    Skip --> [*]
+    Abort --> [*]
+```
+
+#### D3 — Install Sequence
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Installer as install.sh
+    participant Source as qa-scan-repo
+    participant Workspace as .claude / .gemini
+
+    User->>Installer: curl install.sh | bash
+    Installer->>Source: git clone → .agents/qa-scan/
+    Installer->>Installer: detect OS + AI agent
+    Installer->>Installer: bootstrap (brew/apt, bun, playwright)
+
+    par Agent sync
+        Installer->>Workspace: cp agents/*.md → .claude/agents/
+    and Rules sync (v4 ⭐NEW)
+        Installer->>Workspace: cp rules/*.md → .claude/rules/qa-scan/
+        Installer->>Workspace: cp rules/*.md → .gemini/rules/qa-scan/
+    and Gemini sync
+        Installer->>Workspace: cp .gemini/agents/*.md → .gemini/agents/
+    end
+
+    Installer->>Workspace: configure .claude/mcp.json
+    Installer->>Source: gitnexus analyze (optional)
+    Installer->>User: Print /qa-scan usage
+
+    Note over User,Workspace: Update loop
+    User->>Source: edit agent / rule
+    User->>Source: commit + bump version + CHANGELOG
+    User->>Installer: re-run install.sh
+    Installer->>Workspace: sync changes
+```
 
 ### Enforced Agents
 
@@ -100,12 +197,14 @@ Each agent has restricted tool access — cannot exceed its role:
 | # | Agent | Access | Role |
 |---|-------|--------|------|
 | - | orchestrator | Read + spawn | Coordinates pipeline |
+| 0 | context-extractor | Read-only | Extract project context |
+| 0a | env-bootstrap ⭐NEW | Bash + Read | Install deps, setup .env, spawn dev server |
 | 1 | issue-analyzer | Read-only | Extract test requirements |
-| 2 | code-scout | Read-only | Find relevant code files |
-| 2b | flow-analyzer | Read-only | Analyze code → test coverage matrix |
+| 2 | code-scout ⭐MERGED | Read-only | Files + flows + routes + shapes + test matrix |
 | 3 | test-generator | Write evidence/ only | Generate Playwright tests from matrix |
 | 4 | test-runner | Bash only | Execute test + capture video |
 | 5 | coverage-verifier | Read-only, background | Verify test coverage completeness |
+| 5 | adversarial-verifier | Read-only, background | Probe for edge cases/vulns (alt path) |
 | 6 | report-synthesizer | Write report only | VERDICT: PASS/FAIL/PARTIAL |
 
 ### Feedback Loops
