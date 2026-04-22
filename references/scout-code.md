@@ -1,84 +1,159 @@
-# Scout Code — Find Relevant Files
+# Scout Code — Find Relevant Files + Flows + Routes + Shapes (v4 unified)
 
-You are scouting the codebase to find files relevant to a specific feature area.
+You are scouting the codebase to find files, flows, API routes, and response shapes relevant to a specific feature area. **v4: merged former `analyze-flow.md` logic here.**
 
 ## Input
 
-- **feature_area**: e.g., "Product Detail", "Authentication", "Dashboard"
+- **feature_area**: e.g., "Product Detail", "Authentication"
 - **test_scenarios**: from analyze-issue step
 - **repo config**: path, branch, gitnexus flag
+- **project_context**: from qa-context-extractor
+
+## Output JSON Schema
+
+```json
+{
+  "files": [{"path": "...", "purpose": "...", "confidence": 0.0}],
+  "flows": [{"name": "...", "steps": [...], "entry": "...", "module": "..."}],
+  "routes": [{"path": "/api/x", "handler": "...", "middleware": [...], "shape": {...}}],
+  "test_matrix": {
+    "states": [{"name": "loading|error|empty|auth|success", "trigger": "...", "file": "..."}],
+    "actions": [{"name": "onClick|onSubmit|...", "handler": "...", "file": "..."}],
+    "gaps": ["..."]
+  }
+}
+```
+
+---
 
 ## Strategy
 
-### With GitNexus (preferred — if `gitnexus: true` in repo config)
-
-Use GitNexus MCP tools for semantic code understanding:
+### Phase A — With GitNexus (preferred)
 
 1. **Query symbols:**
    ```
    gitnexus_query({query: "{feature_area keywords}"})
    ```
-   Find functions, components, routes related to the feature.
+   Returns processes (flows) + symbols ranked by relevance.
 
-2. **Trace impact (blast radius):**
+2. **Trace impact:**
    ```
    gitnexus_impact({target: "{key_symbol}", direction: "upstream"})
    ```
-   Find all callers and consumers. Prioritize by distance:
-   - **d=1 (direct):** MUST test — functions that directly call/use the changed code
-   - **d=2 (indirect):** SHOULD test — callers of callers
-   - **d=3+ (transitive):** OPTIONAL — regression scope
+   Prioritize: d=1 MUST test, d=2 SHOULD, d=3+ optional.
 
-3. **Get full context:**
+3. **360° context:**
    ```
    gitnexus_context({name: "{symbol}"})
    ```
-   360° view: callers, callees, process participation.
 
-4. **Detect changes (if branch available):**
+4. **Routes:**
+   ```
+   gitnexus_route_map({feature: "..."})
+   gitnexus_shape_check({route: "/api/x"})
+   ```
+   Extract `{path, handler, middleware, responseKeys}` directly.
+
+5. **Detect branch changes (optional):**
    ```
    gitnexus_detect_changes({base_ref: "main"})
    ```
-   Get list of changed symbols in the branch vs main.
 
-### Without GitNexus (fallback)
+### Phase B — Without GitNexus (fallback)
 
-1. **Search routes:** Grep for feature area keywords in routing files
-   - Next.js: `app/` directory structure
-   - React Router: route definitions
+1. **Files:** Grep keywords in `app/`, `pages/`, `src/**`; Glob component patterns
+2. **Flows:** parse states/actions from code (see "Flow Extraction Fallback" below)
+3. **Routes:** grep `route()`, `app.get/post`, Next.js route handlers; extract middleware chains by pattern `withAuth(`, `withRateLimit(`
+4. **Shapes:** grep `.json(`, `res.json(`, `NextResponse.json(` → extract top-level keys
 
-2. **Search components:** Glob for component names matching feature area
-   - `**/*product*detail*` or `**/*auth*`
+### Phase C — Merge
 
-3. **Search API handlers:** Grep for endpoint paths
-   - `/api/products`, `/api/auth`
+Combine Phase A + B outputs. Deduplicate by file path. Prefer GitNexus confidence over fallback.
 
-4. **Search shared utils:** Grep for business logic functions
+---
 
-## Output Format
+## Flow Extraction Fallback (from former analyze-flow.md)
 
-List relevant files with brief purpose:
+Read top 3-5 relevant files. Extract states + actions.
 
+### React / Next.js State Patterns
+
+**Loading:**
+```tsx
+if (isLoading) return <Skeleton />
+// useQuery.isLoading, useMutation.isPending, Suspense fallback
 ```
-## Relevant Files
 
-### Routes
-- `apps/web/app/products/[id]/page.tsx` — Product detail page (main entry)
-
-### Components
-- `apps/web/src/features/product/components/ingredient-list.tsx` — Ingredient display
-- `apps/web/src/features/product/components/analysis-card.tsx` — AI analysis card
-
-### API
-- `packages/api/src/routers/product.ts` — Product API endpoints
-
-### Shared
-- `packages/api/src/services/product-analysis.ts` — Analysis business logic
+**Error:**
+```tsx
+if (error) return <ErrorMessage />
+// try/catch, ErrorBoundary, .catch()
 ```
+
+**Empty:**
+```tsx
+if (!data?.length) return <EmptyState />
+```
+
+**Auth:**
+```tsx
+if (!session) redirect('/login')
+// middleware auth, role-based renders
+```
+
+**Success (branching):**
+```tsx
+{product.hasAnalysis && <AnalysisCard />}
+{items.length > 0 && <List />}
+```
+
+### API / Backend Patterns
+
+**Errors:**
+```ts
+if (!found) return c.json({error}, 404)
+// Zod → 400/422, auth → 401/403
+```
+
+**Success variants:**
+```ts
+// empty [], single item, paginated {data, total, page}
+```
+
+### User Actions
+
+```tsx
+onClick, onSubmit, onPress, onChange, onBlur
+router.push/replace, <Link>, redirect
+useMutation mutate → optimistic/success/error
+```
+
+### Extraction Rules
+
+1. Read full file — states hide in early returns at top
+2. Trace custom hooks — `useProductDetail()` may wrap useQuery
+3. Check props — `isDisabled`, `isReadOnly`, `variant` create branches
+4. Guards = testable states (early returns)
+5. Count `&&` / `? :` in JSX = potential test cases
+
+---
+
+## Priority (test generation)
+
+1. **Error states** — most likely untested, highest impact
+2. **Auth guards** — security-critical
+3. **Empty states** — common UX gap
+4. **Loading states** — important for UX
+5. **Success variants** — conditional renders
+6. **User actions**
+7. **Navigation**
+
+---
 
 ## Rules
 
-1. **Prioritize by test relevance:** route files > page components > API handlers > utils
-2. **Include max 10 files** — focus on most relevant
-3. **Note file purpose** — brief description of what each file does
-4. **Flag generated/config files** — these are less useful for test context
+1. Prioritize: routes > pages > API handlers > utils
+2. Max 10 files — focus relevance
+3. Include file purpose + confidence
+4. Flag generated/config files (skip)
+5. If GitNexus processes=0 AND fallback finds 0 files → DONE_WITH_CONCERNS (empty scout)

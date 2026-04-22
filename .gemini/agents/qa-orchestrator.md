@@ -344,27 +344,20 @@ gitnexus analyze --incremental {repo_path}
 
 Skip if `gitnexus: false` in config.
 
-### Step 2: Scout Code + Flow Discovery
+### Step 2: Scout Code + Flow + Routes + Shapes (v4 unified)
 
 Spawn agent: `qa-code-scout`
-Input: feature_area + repo_path + gitnexus flag + project_context
-Output: files[] + flows[] (if GitNexus available)
+Input: feature_area + test_scenarios + repo_path + gitnexus flag + project_context
+Output unified JSON: `{files, flows, routes, shapes, test_matrix: {states, actions, gaps}}`
 
-Agent uses GitNexus for semantic search and flow tracing when available.
-See: `references/gitnexus-flows.md`
+v4 change: qa-code-scout absorbs former `qa-flow-analyzer`. GitNexus preferred; grep/glob fallback when unavailable.
+
+See: `references/scout-code.md`, `references/gitnexus-flows.md`.
 
 **Status handling:**
-- DONE: Continue with files
-- DONE_WITH_CONCERNS (0 files, GitNexus unavailable): Proceed with issue-only
-- BLOCKED: Escalate
-
-### Step 2b: Analyze Flow
-
-**Guard:** If Step 2 returns 0 files, skip to Step 3 with test_scenarios only.
-
-Spawn agent: `qa-flow-analyzer`
-Input: relevant_files + feature_area + test_scenarios + flows (from Step 2)
-Output: test_matrix JSON (states[], actions[], coverage_summary)
+- DONE: Continue with full contract
+- DONE_WITH_CONCERNS: Continue, note limitation
+- BLOCKED (0 files): T3 template
 
 ### Step 3: Generate Test
 
