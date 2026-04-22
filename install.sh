@@ -582,10 +582,16 @@ header "Agents"
 
 # Claude Code
 if [ "$HAS_CLAUDE" = true ]; then
-  mkdir -p "$WORKSPACE/.claude/agents" "$WORKSPACE/.claude/skills/qa-scan"
+  mkdir -p "$WORKSPACE/.claude/agents" "$WORKSPACE/.claude/skills/qa-scan" "$WORKSPACE/.claude/rules/qa-scan"
   for f in agents/qa-*.md; do [ -f "$f" ] && cp "$f" "$WORKSPACE/.claude/agents/"; done
   cp adapters/claude-skill.md "$WORKSPACE/.claude/skills/qa-scan/SKILL.md" 2>/dev/null || true
-  info "Claude agents installed"
+  # v4: rules sync
+  if [ -d "rules" ]; then
+    for f in rules/*.md; do [ -f "$f" ] && cp "$f" "$WORKSPACE/.claude/rules/qa-scan/"; done
+  fi
+  # v4: cleanup stale agents
+  rm -f "$WORKSPACE/.claude/agents/qa-flow-analyzer.md"
+  info "Claude agents + rules installed"
 fi
 
 # Gemini CLI — convert frontmatter to Gemini format
@@ -638,20 +644,26 @@ convert_agent_for_gemini() {
 }
 
 if [ "$HAS_GEMINI" = true ]; then
-  mkdir -p "$WORKSPACE/.gemini/agents"
+  mkdir -p "$WORKSPACE/.gemini/agents" "$WORKSPACE/.gemini/rules/qa-scan"
   for f in agents/qa-*.md; do
     [ -f "$f" ] || continue
     convert_agent_for_gemini "$f" "$WORKSPACE/.gemini/agents/$(basename "$f")"
   done
   # Cleanup old command format (TOML → deprecated)
   rm -rf "$WORKSPACE/.gemini/commands/qa" 2>/dev/null || true
+  # v4: rules sync (Gemini doesn't auto-load, agents read explicitly)
+  if [ -d "rules" ]; then
+    for f in rules/*.md; do [ -f "$f" ] && cp "$f" "$WORKSPACE/.gemini/rules/qa-scan/"; done
+  fi
+  # v4: cleanup stale agents
+  rm -f "$WORKSPACE/.gemini/agents/qa-flow-analyzer.md"
   # Gemini prompt template: /scan
   mkdir -p "$WORKSPACE/.gemini/prompts"
   cp adapters/gemini-prompt/scan.md "$WORKSPACE/.gemini/prompts/scan.md" 2>/dev/null || true
   # Gemini skill: auto-activate on QA requests
   mkdir -p "$WORKSPACE/.gemini/skills/qa-scan"
   cp adapters/gemini-skill/SKILL.md "$WORKSPACE/.gemini/skills/qa-scan/SKILL.md" 2>/dev/null || true
-  info "Gemini agents + /scan prompt + skill installed"
+  info "Gemini agents + rules + /scan prompt + skill installed"
 fi
 
 # Antigravity

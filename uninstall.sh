@@ -52,10 +52,22 @@ if [ -d "$WORKSPACE/.claude/skills/qa-scan" ]; then
   info "Removed Claude skill adapter"
 fi
 
+# v4: Remove Claude rules
+if [ -d "$WORKSPACE/.claude/rules/qa-scan" ]; then
+  rm -rf "$WORKSPACE/.claude/rules/qa-scan"
+  info "Removed Claude rules"
+fi
+
 # Remove Gemini agents
 if ls "$WORKSPACE/.gemini/agents"/qa-*.md &>/dev/null; then
   rm -f "$WORKSPACE/.gemini/agents"/qa-*.md
   info "Removed Gemini agents"
+fi
+
+# v4: Remove Gemini rules
+if [ -d "$WORKSPACE/.gemini/rules/qa-scan" ]; then
+  rm -rf "$WORKSPACE/.gemini/rules/qa-scan"
+  info "Removed Gemini rules"
 fi
 
 # Remove Antigravity adapter

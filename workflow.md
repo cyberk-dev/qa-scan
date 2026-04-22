@@ -57,16 +57,23 @@ Scans all issues currently in QA status:
 
 ---
 
-## Pipeline (8 Steps)
+## Pipeline (9 Steps — v4)
 
-### Step 0 — Project Context + Server Health (Claude agents: automatic)
+### Step 0 — Project Context (Claude: qa-context-extractor)
 
-Before running the pipeline, verify:
-1. Read project docs (`README.md`, `CLAUDE.md`, `package.json`) — understand tech stack
-2. Dev server health check: `curl -s -o /dev/null -w "%{http_code}" {base_url}`
-   - If `200`: continue
-   - If fail: auto-start via `dev_command` from config, poll 2s intervals, timeout 30s
-   - If still fail: VERDICT: PARTIAL ("Server could not be started")
+Read project docs (`README.md`, `CLAUDE.md`, `package.json`) → extract stack, entry points, dev command.
+
+### Step 0a — Env Bootstrap (v4 ⭐NEW)
+
+Load: `./references/env-bootstrap.md`
+
+Auto-detect stack → install deps → setup `.env` → start Docker services → **kill port occupants** → spawn dev server → wait-for-ready.
+
+Optional `.qa-scan.yaml` manifest ở target repo root override auto-detect.
+
+Env var escape: `QA_SCAN_NO_KILL=1` → skip kill, BLOCKED on port conflict.
+
+**Output:** `{base_url, server_pid, service_pids, cleanup_hook, diagnostics}`
 
 ### Step 1 — Fetch + Analyze Issue
 
@@ -109,39 +116,26 @@ Feed issue title + description to LLM with the analyze-issue prompt.
 
 If confidence < 0.5 → warn user, suggest manual testing.
 
-### Step 2 — Scout Code
+### Step 2 — Scout Code + Flow + Routes + Shapes (v4 unified)
 
-Load: `./references/scout-code.md`
+Load: `./references/scout-code.md` (includes former analyze-flow.md content inline)
 
-Find relevant source code for the feature area.
+v4: Step 2 + Step 2b merged. One agent pass produces everything.
 
-**With GitNexus (if `gitnexus: true` in config):**
-1. `gitnexus_query({query: "{feature_area}"})` → find symbols
-2. `gitnexus_impact({target: "{changed_function}", direction: "upstream"})` → blast radius
-3. `gitnexus_context({name: "{symbol}"})` → callers, callees
+**With GitNexus:**
+1. `gitnexus_query({query: "{feature_area}"})` → flows + symbols
+2. `gitnexus_impact(...)` → blast radius
+3. `gitnexus_context(...)` → callers/callees
+4. `gitnexus_route_map(...)` + `gitnexus_shape_check(...)` → API routes + response shapes
 
 **Without GitNexus (fallback):**
-1. Grep for feature_area keywords in routes, components, API handlers
-2. Glob for related file patterns
-3. Read key files to understand structure
+1. Grep/glob files by feature keywords
+2. Parse top 3-5 files for states/actions (see scout-code.md "Flow Extraction Fallback")
+3. Grep route handlers + `.json(` calls → routes + shapes
 
-**Output:** List of relevant files with purpose of each.
+**Output:** `{files, flows, routes, shapes, test_matrix: {states, actions, gaps}}`
 
-### Step 2b — Analyze Flow
-
-Load: `./references/analyze-flow.md`
-
-Read the code files from Step 3 and extract all testable states, branches, and user actions.
-
-**What to extract:**
-- UI states: loading, success, error, empty, auth-required
-- Conditional renders: `{condition && ...}`, ternary operators
-- User actions: onClick, onSubmit, onChange handlers
-- API call states: useQuery/useMutation loading/error/success
-
-**Output:** Test coverage matrix (JSON) — states[], actions[], coverage_summary.
-
-> **Note:** This step runs automatically in the Claude agents pipeline (qa-flow-analyzer). For Gemini/Antigravity, manually read the top 3-5 files from Step 3 and extract states before generating tests.
+> v4 note: `qa-flow-analyzer` agent removed. Logic lives inline trong `scout-code.md`. Gemini/Antigravity: the fallback section is runnable directly without separate agent.
 
 ### Step 3 — Generate Test
 
