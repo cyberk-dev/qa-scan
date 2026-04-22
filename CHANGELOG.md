@@ -2,6 +2,19 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.0.1] — 2026-04-22
+
+### Fixed
+
+- **Gemini CLI `/qa-scan` slash command not installed on fresh install** — `install.sh` now copies `.gemini/commands/*.toml` → `$WORKSPACE/.gemini/commands/`. Previously only `/scan` MD prompt was synced, making `/qa-scan` unavailable on fresh machines. `uninstall.sh` updated to clean up.
+
+### Upgrade
+
+Re-run installer:
+```bash
+curl -fsSL https://raw.githubusercontent.com/cyberk-dev/qa-scan/main/install.sh | bash
+```
+
 ## [4.0.0] — 2026-04-22
 
 ### Breaking

@@ -64,6 +64,12 @@ if ls "$WORKSPACE/.gemini/agents"/qa-*.md &>/dev/null; then
   info "Removed Gemini agents"
 fi
 
+# v4.0.1: Remove Gemini slash commands
+if ls "$WORKSPACE/.gemini/commands"/qa-*.toml &>/dev/null; then
+  rm -f "$WORKSPACE/.gemini/commands"/qa-*.toml
+  info "Removed Gemini slash commands"
+fi
+
 # v4: Remove Gemini rules
 if [ -d "$WORKSPACE/.gemini/rules/qa-scan" ]; then
   rm -rf "$WORKSPACE/.gemini/rules/qa-scan"

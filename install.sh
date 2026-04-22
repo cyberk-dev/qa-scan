@@ -649,21 +649,28 @@ if [ "$HAS_GEMINI" = true ]; then
     [ -f "$f" ] || continue
     convert_agent_for_gemini "$f" "$WORKSPACE/.gemini/agents/$(basename "$f")"
   done
-  # Cleanup old command format (TOML → deprecated)
+  # Cleanup old nested command dir format (TOML in subdirectory → deprecated)
   rm -rf "$WORKSPACE/.gemini/commands/qa" 2>/dev/null || true
+  # v4.0.1: install /qa-scan slash command (TOML flat file format)
+  mkdir -p "$WORKSPACE/.gemini/commands"
+  if [ -d ".gemini/commands" ]; then
+    for f in .gemini/commands/*.toml; do
+      [ -f "$f" ] && cp "$f" "$WORKSPACE/.gemini/commands/"
+    done
+  fi
   # v4: rules sync (Gemini doesn't auto-load, agents read explicitly)
   if [ -d "rules" ]; then
     for f in rules/*.md; do [ -f "$f" ] && cp "$f" "$WORKSPACE/.gemini/rules/qa-scan/"; done
   fi
   # v4: cleanup stale agents
   rm -f "$WORKSPACE/.gemini/agents/qa-flow-analyzer.md"
-  # Gemini prompt template: /scan
+  # Gemini prompt template: /scan (backward compat)
   mkdir -p "$WORKSPACE/.gemini/prompts"
   cp adapters/gemini-prompt/scan.md "$WORKSPACE/.gemini/prompts/scan.md" 2>/dev/null || true
   # Gemini skill: auto-activate on QA requests
   mkdir -p "$WORKSPACE/.gemini/skills/qa-scan"
   cp adapters/gemini-skill/SKILL.md "$WORKSPACE/.gemini/skills/qa-scan/SKILL.md" 2>/dev/null || true
-  info "Gemini agents + rules + /scan prompt + skill installed"
+  info "Gemini agents + rules + /qa-scan command + /scan prompt + skill installed"
 fi
 
 # Antigravity
