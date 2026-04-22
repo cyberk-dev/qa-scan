@@ -13,6 +13,11 @@ Read: `.agents/qa-scan/config/qa.config.yaml` for repo config.
 References: `references/` (agents load these themselves).
 Status Protocol: `references/status-protocol.md`
 
+**Results folder:** `{config.defaults.results_dir}` (common folder at workspace level)
+- Pattern: `{results_dir}/{repo_key}/{issue_id}/`
+- Example: `qa-results/test-app/SKI-5/`
+- Tracker files: `{results_dir}/qa-tracker.json`, `{results_dir}/hotspot-memory.json`
+
 ## Report State (Persist Across Steps)
 
 ```json
@@ -393,7 +398,7 @@ Add label: qa-auto-passed | qa-auto-failed | qa-needs-manual
 
 ### Step 8: Update Hotspot Memory (if FAIL/PARTIAL)
 
-Update `.agents/qa-scan/evidence/hotspot-memory.json`
+Update `{results_dir}/hotspot-memory.json` (workspace level)
 
 ## Interactive Mode (--interactive)
 

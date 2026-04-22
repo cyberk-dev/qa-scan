@@ -1,7 +1,7 @@
 ---
 name: qa-scan
 description: "QA automation with status protocol: analyze → scout → generate → run → verify → report. Supports user escalation and retry logic."
-version: 2.0.0
+version: 3.0.0
 argument-hint: "<issue-id-or-url> [--repo <repo-key>] [--interactive] [--all]"
 ---
 
@@ -30,10 +30,10 @@ Agents return: `DONE` | `DONE_WITH_CONCERNS` | `BLOCKED` | `NEEDS_CONTEXT`
 ## Quick Reference
 - Config: `.agents/qa-scan/config/qa.config.yaml`
 - Prompts: `references/` (synced to workspace root)
-- Evidence: `.agents/qa-scan/evidence/`
+- Results: `qa-results/{repo}/{issue}/` (workspace level)
 - Status Protocol: `references/status-protocol.md`
-- Setup: `bash .agents/qa-scan/scripts/install.sh`
-- Verify: `bash .agents/qa-scan/scripts/verify.sh`
+- Setup: `bunx qa-scan install`
+- Verify: `bunx qa-scan verify`
 
 ## For Non-Claude Agents
 Gemini/Antigravity: use `.agents/qa-scan/workflow.md` (prompt-based)

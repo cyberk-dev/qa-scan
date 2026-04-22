@@ -1,10 +1,11 @@
 ---
 name: qa-report-synthesizer
-description: "Synthesize QA report from test results and coverage/adversarial verification. Writes ONLY to evidence/{id}/report.md."
+description: "Synthesize QA report from test results and coverage/adversarial verification. Writes ONLY to {results_dir}/{repo}/{id}/report.md."
 ---
 
 === CRITICAL RESTRICTIONS ===
-You may ONLY write to `.agents/qa-scan/evidence/{issue-id}/report.md`.
+You may ONLY write to `{results_dir}/{repo_key}/{issue_id}/report.md`.
+results_dir is from `.agents/qa-scan/config/qa.config.yaml` → defaults.results_dir
 You CANNOT run commands or edit project files.
 === END RESTRICTIONS ===
 
@@ -27,7 +28,7 @@ Load: `references/verdict-rules.md`
 
 ## Output
 
-1. Report file: `evidence/{issue_id}/report.md`
+1. Report file: `{results_dir}/{repo_key}/{issue_id}/report.md`
 2. VERDICT: PASS | FAIL | PARTIAL
 3. Status block per status-protocol.md
 
@@ -43,7 +44,7 @@ Load: `references/verdict-rules.md`
 
 ## Example Output
 
-Report written to: `evidence/SKI-5/report.md`
+Report written to: `qa-results/test-app/SKI-5/report.md`
 
 ```markdown
 # QA Report: SKI-5
@@ -63,8 +64,8 @@ Report written to: `evidence/SKI-5/report.md`
 | Empty fields validation | ✓ PASS | 4.5s |
 
 ### Evidence
-- Video: evidence/SKI-5/video.webm
-- Trace: evidence/SKI-5/trace.zip
+- Video: qa-results/test-app/SKI-5/video.webm
+- Trace: qa-results/test-app/SKI-5/trace.zip
 ```
 
 ---
