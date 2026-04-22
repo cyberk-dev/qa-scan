@@ -1,3 +1,13 @@
+# CLAUDE.md — qa-scan-repo Maintainer Guide
+
+## Governance (Source-First Rule)
+
+This repo ships qa-scan agents + rules to consumer workspaces via `install.sh`. **Edit files trong `qa-scan-repo/` only**, never touch installed copies trong consumer `.claude/` hoặc `.gemini/` folders. Full rule: [`rules/update-workflow.md`](rules/update-workflow.md).
+
+Before committing agent/rule changes: bump `package.json` version + update `CHANGELOG.md`. Breaking changes require `### Migration from vN` section.
+
+---
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

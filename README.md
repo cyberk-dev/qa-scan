@@ -169,6 +169,17 @@ cp .agents/qa-scan/test-app/qa.config.test.yaml .agents/qa-scan/config/qa.config
 /qa-scan TEST-001 --repo test-app
 ```
 
+## Governance (Maintainers)
+
+`qa-scan-repo` là **single source of truth**. Workspace `.claude/agents/qa-*.md`, `.gemini/agents/qa-*.md`, `.claude/rules/qa-scan/*.md`, `.gemini/rules/qa-scan/*.md` chỉ là installed copies — **không edit trực tiếp**.
+
+Update chain:
+1. Edit source trong `qa-scan-repo/`
+2. Commit + bump version (`package.json`) + update `CHANGELOG.md`
+3. Re-run `install.sh` trong workspace → sync copies
+
+Full rule: [`rules/update-workflow.md`](rules/update-workflow.md)
+
 ## Updating
 
 Re-run install — pulls latest, preserves config:
