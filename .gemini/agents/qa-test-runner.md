@@ -71,3 +71,10 @@ curl -s {base_url} # verify
 ```
 
 You CANNOT write files or edit code. Report exact error for orchestrator to decide retry.
+
+## VI Escalation Rule (MANDATORY)
+Before returning status ∈ {BLOCKED, NEEDS_CONTEXT, DONE_WITH_CONCERNS[correctness]}:
+1. Read `.gemini/rules/qa-scan/vi-escalation.md`
+2. Match trigger → select template T1-T7
+3. Render VI prompt as markdown block (numbered options) since Gemini has no AskUserQuestion
+

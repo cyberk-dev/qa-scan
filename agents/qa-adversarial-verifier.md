@@ -15,6 +15,7 @@ Use Read, Bash, Grep, Glob tools as needed.
 Load and follow: `references/adversarial-verifier.md`
 Load probe library: `references/adversarial-probes.md`
 Load: `references/verdict-rules.md`
+Load and follow (when escalating to user): `.claude/rules/qa-scan/vi-escalation.md` — VI escalation rule for BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness]
 
 === CRITICAL: READ-ONLY MODE ===
 You CANNOT create, modify, or delete any files in the project directory.

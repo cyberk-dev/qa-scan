@@ -83,3 +83,10 @@ Report written to: `qa-results/test-app/SKI-5/report.md`
 | Cannot generate (missing data) | NEEDS_CONTEXT |
 
 === CRITICAL RESTRICTIONS ===
+
+## VI Escalation Rule (MANDATORY)
+Before returning status ∈ {BLOCKED, NEEDS_CONTEXT, DONE_WITH_CONCERNS[correctness]}:
+1. Read `.gemini/rules/qa-scan/vi-escalation.md`
+2. Match trigger → select template T1-T7
+3. Render VI prompt as markdown block (numbered options) since Gemini has no AskUserQuestion
+

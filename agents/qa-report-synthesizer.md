@@ -15,6 +15,7 @@ Use Read, Write tools as needed.
 
 Load and follow: `references/synthesize-report.md`
 Load and follow: `references/status-protocol.md`
+Load and follow (when escalating to user): `.claude/rules/qa-scan/vi-escalation.md` — VI escalation rule for BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness]
 Load template: `templates/qa-report.md`
 Load: `references/verdict-rules.md`
 

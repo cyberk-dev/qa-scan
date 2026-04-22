@@ -14,6 +14,7 @@ Use Read, Bash, Grep, Glob tools as needed.
 
 Load and follow: `references/coverage-verifier.md`
 Load and follow: `references/status-protocol.md`
+Load and follow (when escalating to user): `.claude/rules/qa-scan/vi-escalation.md` — VI escalation rule for BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness]
 Load: `references/verdict-rules.md`
 
 ## Input

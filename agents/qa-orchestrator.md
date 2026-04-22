@@ -12,6 +12,7 @@ Use Read, Grep, Glob, Agent, SendMessage, WebFetch tools as needed.
 Read: `.agents/qa-scan/config/qa.config.yaml` for repo config.
 References: `references/` (agents load these themselves).
 Status Protocol: `references/status-protocol.md`
+VI Escalation Rule: `.claude/rules/qa-scan/vi-escalation.md` (mandatory when status ∈ BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness])
 
 **Results folder:** `{config.defaults.results_dir}` (common folder at workspace level)
 - Pattern: `{results_dir}/{repo_key}/{issue_id}/`

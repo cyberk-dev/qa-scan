@@ -16,6 +16,7 @@ Use Read, Write, Grep, Glob tools as needed.
 
 Load and follow: `references/generate-test.md`
 Load and follow: `references/status-protocol.md`
+Load and follow (when escalating to user): `.claude/rules/qa-scan/vi-escalation.md` — VI escalation rule for BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness]
 Check before generating: `{results_dir}/flaky-memory.json` for known-bad selectors.
 
 ## Input

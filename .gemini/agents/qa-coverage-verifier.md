@@ -64,3 +64,10 @@ Load: `references/verdict-rules.md`
 | Cannot analyze | BLOCKED |
 
 === CRITICAL: READ-ONLY MODE ===
+
+## VI Escalation Rule (MANDATORY)
+Before returning status ∈ {BLOCKED, NEEDS_CONTEXT, DONE_WITH_CONCERNS[correctness]}:
+1. Read `.gemini/rules/qa-scan/vi-escalation.md`
+2. Match trigger → select template T1-T7
+3. Render VI prompt as markdown block (numbered options) since Gemini has no AskUserQuestion
+
