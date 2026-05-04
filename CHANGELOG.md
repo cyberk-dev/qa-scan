@@ -2,6 +2,35 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.2.0] — 2026-05-04
+
+### Changed
+
+- **`qa-orchestrator` enforces explicit `Task()` spawn pattern.** Each step that previously said "Spawn agent: X" (8 steps total: context-extractor, env-bootstrap, issue-analyzer, code-scout, test-generator, test-runner, coverage-verifier, report-synthesizer) now contains a copy-verbatim `Task(subagent_type=…, description=…, prompt=…)` code block with concrete input/output file paths. Prior wording was ambiguous → orchestrator inlined sub-agent work into its own context, bloating one session past timeout.
+- **Disk-based state contract.** Each sub-agent now writes its output JSON to `{results_dir}/{repo_key}/{issue_id}/state/step-{n}-{name}.json`. Subsequent agents read previous step state from that path instead of receiving full payload through prompt context. Mirrors `research-orchestrator` pattern (`run-cell-v3.sh` + `cells/{cell_id}/*.json`) which has been proven to scale.
+
+### Added
+
+- **AUTONOMOUS EXECUTION block** (top of `qa-orchestrator.md`) — mirrors `research-orchestrator.md`. Orchestrator MUST NOT stop between steps; only stops on `BLOCKED`, `NEEDS_CONTEXT`, or `COMPLETE`. Treats the entire run as one atomic task.
+- **Sub-agent Spawn Pattern section** with canonical `Task()` template. Hard rule: orchestrator never reads agent files itself, never executes step bodies itself, never calls sub-agent tools (Bash/MCP/Read on the sub-agent's behalf). Toolkit intentionally minimal: `Read` (config + status only), `Task` (spawn), `SendMessage` (escalation).
+- **Inline-Detection Guard** — orchestrator must emit `INLINE_DETECTED` and resume via `Task()` if it catches itself reading agent files, running sub-agent tools, or producing sub-agent JSON output directly.
+
+### Why
+
+Live runtime observed orchestrator running ALL 8 steps in one subagent context (no `Task()` invocations), causing context bloat → timeout → session cancellation around step 5–6. Root cause: prompt wording "Spawn agent: X" was treated as plain text, not a runtime instruction. Fix copies the proven research pipeline pattern (explicit Task spawn + disk-based state passing) so each sub-agent gets its own 200K-token context window and orchestrator only holds state pointers.
+
+### Migration from 4.1.x
+
+No breaking changes for end users — same `/qa-scan SKI-101` invocation. Sub-agent contracts (qa-context-extractor.md, qa-env-bootstrap.md, etc.) unchanged. Behavior change: orchestrator now spawns each sub-agent through Claude's Task tool. On Gemini CLI (which lacks Task spawning), pipeline still inlines — full Gemini fix tracked for v5.0.0.
+
+### Upgrade
+
+```bash
+bash qa-scan-repo/install.sh --non-interactive
+```
+
+Verify: `grep -c "subagent_type=" .claude/agents/qa-orchestrator.md` should output `9` (1 template + 8 step invocations).
+
 ## [4.1.0] — 2026-05-04
 
 ### Changed

@@ -14,6 +14,73 @@ References: `references/` (agents load these themselves).
 Status Protocol: `references/status-protocol.md`
 VI Escalation Rule: `.claude/rules/qa-scan/vi-escalation.md` (mandatory when status ∈ BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness])
 
+## AUTONOMOUS EXECUTION (CRITICAL — read before anything else)
+
+This pipeline runs ALL steps in ONE continuous orchestrator session. You MUST NOT stop between:
+- Pre-flight checks and Step 0
+- Steps (0 → 0a → 1 → 1c → 2 → 3 → 4 → 5 → 6 transitions are automatic)
+- Sub-agent invocations (after a sub-agent returns DONE/DONE_WITH_CONCERNS, IMMEDIATELY spawn the next)
+
+You only stop when:
+1. Status `BLOCKED` (escalation required per T1–T7 templates)
+2. Status `NEEDS_CONTEXT` (missing input only the user can supply)
+3. Status `COMPLETE` (Step 6 report synthesized → VERDICT delivered)
+4. User sends explicit halt signal
+
+Treat the entire run as a SINGLE atomic task. Do not summarize progress mid-run unless an
+escalation triggers (`BLOCKED`, `NEEDS_CONTEXT`, or budget protocol). Do not ask the user
+"should I continue" — the answer is YES, continue until done.
+
+If you find yourself emitting a "summary" or "next steps" before the COMPLETE marker, you
+are stopping incorrectly — resume immediately to the next pending step.
+
+## Sub-agent Spawn Pattern (MANDATORY)
+
+Every step that says "Spawn sub-agent: X" MUST be invoked via the **Task tool**, not inlined.
+You — the orchestrator — **never** read agent files yourself, **never** execute step bodies
+yourself, **never** call sub-agent tools (Bash, MCP, Read on agent's behalf) yourself. You
+only:
+
+1. Build the Task() invocation
+2. Wait for the sub-agent's response
+3. Parse its status block
+4. Decide next step
+
+**Canonical pattern (copy verbatim, fill placeholders):**
+
+```
+Task(
+  subagent_type="<agent-name>",   # e.g. "qa-context-extractor"
+  description="<short verb phrase>",  # 3–5 words, shown in UI
+  prompt="""
+<concise inputs the agent needs>
+
+results_dir: {results_dir}
+repo_path: {repo_path}
+repo_key: {repo_key}
+issue_id: {issue_id}
+project_context: {project_context_path_or_inline}
+
+Read your agent file at .claude/agents/<agent-name>.md and execute per spec.
+Write any artifacts under {results_dir}/{repo_key}/{issue_id}/.
+Return ONLY the status block per references/status-protocol.md.
+"""
+)
+```
+
+**Inline-Detection Guard (HARD RULE):**
+
+If you catch yourself doing ANY of these, you are violating the spawn pattern → STOP and
+emit `INLINE_DETECTED` to the user, then resume by calling Task() instead:
+- Reading `agents/qa-*.md` (other than this orchestrator file) yourself
+- Running `bash`, `Read`, `Grep`, MCP calls that belong to a sub-agent's responsibilities
+- Executing step bodies described under "Procedure" of any sub-agent doc
+- Producing JSON output that a sub-agent should produce
+
+The orchestrator's own toolkit is intentionally minimal: Read (config + status files only),
+Task (spawn sub-agents), SendMessage (escalation prompts). Bash/Grep/Glob are only for
+pre-flight tool-availability checks (Step -1), never for step bodies.
+
 ## Hard Rules
 
 - **NEVER run install commands during pre-flight.** Stack/package-manager is unknown until `qa-context-extractor` (Step 0) reads the lockfile. All install operations belong to `qa-env-bootstrap` (Step 0a), which is lockfile-aware (bun/pnpm/npm/yarn).
@@ -262,11 +329,26 @@ Reply with option number:
 
 ### Step 0: Project Context Extraction
 
-Spawn agent: `qa-context-extractor`
-Input: repo_path
-Output: project context JSON (tech stack, commands, entry points)
+Spawn sub-agent via Task tool (do NOT inline):
 
-Store in `report_state.project_context` — pass to ALL subsequent agents.
+```
+Task(
+  subagent_type="qa-context-extractor",
+  description="Extract project context",
+  prompt="""
+repo_path: {repo_path}
+results_dir: {results_dir}/{repo_key}/{issue_id}
+
+Read your agent file at .claude/agents/qa-context-extractor.md and execute per spec.
+Detect tech stack, package manager (via lockfile), entry points, dev/build/test commands.
+Write project_context JSON to {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json.
+Return ONLY the status block per references/status-protocol.md.
+"""
+)
+```
+
+Output: project context JSON (tech stack, commands, entry points).
+Store path in `report_state.project_context` — pass to ALL subsequent agents.
 
 **Status handling:**
 - DONE: Continue with context
@@ -276,8 +358,28 @@ Store in `report_state.project_context` — pass to ALL subsequent agents.
 
 ### Step 0a: Env Bootstrap (NEW in v4)
 
-Spawn agent: `qa-env-bootstrap`
-Input: repo_path, repo_key, manifest_path (optional `.qa-scan.yaml`), results_dir, project_context
+Spawn sub-agent via Task tool (do NOT inline — destructive ops belong in the sub-agent's context):
+
+```
+Task(
+  subagent_type="qa-env-bootstrap",
+  description="Bootstrap dev env",
+  prompt="""
+repo_path: {repo_path}
+repo_key: {repo_key}
+manifest_path: {.qa-scan.yaml or null}
+results_dir: {results_dir}/{repo_key}/{issue_id}
+project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
+
+Read your agent file at .claude/agents/qa-env-bootstrap.md and execute the 8-step procedure.
+Use the package manager detected by qa-context-extractor (read project_context file). Never
+hardcode bun/npm/pnpm/yarn.
+Write the output contract JSON to {results_dir}/{repo_key}/{issue_id}/state/step-0a-env.json.
+Return ONLY the status block.
+"""
+)
+```
+
 Output: `{base_url, server_pid, service_pids, env_file, cleanup_hook, diagnostics}`
 
 Agent responsibilities (8 steps): stack detection → install deps → setup .env → start services → kill port occupant → spawn dev server → wait-for-ready → return contract.
@@ -298,9 +400,27 @@ See `references/env-bootstrap.md` for heuristics + manifest schema.
 
 ### Step 1: Analyze Issue
 
-Spawn agent: `qa-issue-analyzer`
-Input: issue URL/ID + repo config + project_context
-Output: JSON with feature_area, test_scenarios, expected_behavior, confidence
+Spawn sub-agent via Task tool:
+
+```
+Task(
+  subagent_type="qa-issue-analyzer",
+  description="Analyze issue",
+  prompt="""
+issue_id: {issue_id}
+repo_key: {repo_key}
+results_dir: {results_dir}/{repo_key}/{issue_id}
+project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
+
+Read your agent file at .claude/agents/qa-issue-analyzer.md and execute.
+Fetch issue from Linear/GitHub, extract feature_area + test_scenarios + expected_behavior.
+Write analysis JSON to {results_dir}/{repo_key}/{issue_id}/state/step-1-issue.json.
+Return ONLY the status block.
+"""
+)
+```
+
+Output: JSON with feature_area, test_scenarios, expected_behavior, confidence.
 
 **Status handling:**
 - DONE: Continue
@@ -366,8 +486,28 @@ Skip if `gitnexus: false` in config.
 
 ### Step 2: Scout Code + Flow + Routes + Shapes (v4 unified)
 
-Spawn agent: `qa-code-scout`
-Input: feature_area + test_scenarios + repo_path + gitnexus flag + project_context
+Spawn sub-agent via Task tool:
+
+```
+Task(
+  subagent_type="qa-code-scout",
+  description="Scout code + flows",
+  prompt="""
+repo_path: {repo_path}
+results_dir: {results_dir}/{repo_key}/{issue_id}
+issue_state: {results_dir}/{repo_key}/{issue_id}/state/step-1-issue.json
+project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
+gitnexus_enabled: {true|false from config}
+
+Read your agent file at .claude/agents/qa-code-scout.md and execute.
+Find files + flows + routes + shapes + test_matrix in one pass.
+Use GitNexus when available (preferred); fall back to grep/glob.
+Write scout JSON to {results_dir}/{repo_key}/{issue_id}/state/step-2-scout.json.
+Return ONLY the status block.
+"""
+)
+```
+
 Output unified JSON: `{files, flows, routes, shapes, test_matrix: {states, actions, gaps}}`
 
 v4 change: qa-code-scout absorbs former `qa-flow-analyzer`. Single pass produces everything needed for Step 3. GitNexus preferred; grep/glob fallback when unavailable (processes=0 or MCP down).
@@ -381,9 +521,30 @@ See: `references/scout-code.md` (strategy + flow-extraction fallback), `referenc
 
 ### Step 3: Generate Test
 
-Spawn agent: `qa-test-generator`
-Input: test_scenarios + code_context + base_url + issue_id + test_matrix + project_context
-Output: test file path (evidence/{issue-id}/test.spec.ts)
+Spawn sub-agent via Task tool:
+
+```
+Task(
+  subagent_type="qa-test-generator",
+  description="Generate Playwright test",
+  prompt="""
+issue_id: {issue_id}
+results_dir: {results_dir}/{repo_key}/{issue_id}
+issue_state: {results_dir}/{repo_key}/{issue_id}/state/step-1-issue.json
+scout_state: {results_dir}/{repo_key}/{issue_id}/state/step-2-scout.json
+env_state: {results_dir}/{repo_key}/{issue_id}/state/step-0a-env.json
+project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
+
+Read your agent file at .claude/agents/qa-test-generator.md and execute.
+Use base_url from env_state. Generate Playwright E2E spec covering all test_scenarios.
+Write spec to {results_dir}/{repo_key}/{issue_id}/evidence/test.spec.ts.
+Write generation summary to {results_dir}/{repo_key}/{issue_id}/state/step-3-test.json.
+Return ONLY the status block.
+"""
+)
+```
+
+Output: test file path under `evidence/test.spec.ts`
 
 **Status handling:**
 - DONE: Continue
@@ -391,9 +552,28 @@ Output: test file path (evidence/{issue-id}/test.spec.ts)
 
 ### Step 4: Run Test
 
-Spawn agent: `qa-test-runner`
-Input: test file path + playwright config + base_url
-Output: results (pass/fail), artifact paths
+Spawn sub-agent via Task tool:
+
+```
+Task(
+  subagent_type="qa-test-runner",
+  description="Run Playwright test",
+  prompt="""
+results_dir: {results_dir}/{repo_key}/{issue_id}
+test_file: {results_dir}/{repo_key}/{issue_id}/evidence/test.spec.ts
+env_state: {results_dir}/{repo_key}/{issue_id}/state/step-0a-env.json
+playwright_config: scripts/playwright.config.ts
+
+Read your agent file at .claude/agents/qa-test-runner.md and execute.
+Run Playwright with video + trace capture. Read base_url from env_state.
+Write run results to {results_dir}/{repo_key}/{issue_id}/state/step-4-run.json
+(include exit_code, pass/fail counts, trace_path, video_path, last_error if any).
+Return ONLY the status block.
+"""
+)
+```
+
+Output: results (pass/fail), artifact paths.
 
 **Status handling:**
 - DONE: Continue
@@ -401,17 +581,55 @@ Output: results (pass/fail), artifact paths
 
 ### Step 5: Coverage Verification
 
-Spawn agent: `qa-coverage-verifier` (background, timeout 5min)
-Input: test_matrix + test_results + test_file + base_url
-Output: coverage report + gaps
+Spawn sub-agent via Task tool (background, timeout 5min):
 
+```
+Task(
+  subagent_type="qa-coverage-verifier",
+  description="Verify coverage",
+  prompt="""
+results_dir: {results_dir}/{repo_key}/{issue_id}
+scout_state: {results_dir}/{repo_key}/{issue_id}/state/step-2-scout.json
+run_state: {results_dir}/{repo_key}/{issue_id}/state/step-4-run.json
+test_file: {results_dir}/{repo_key}/{issue_id}/evidence/test.spec.ts
+
+Read your agent file at .claude/agents/qa-coverage-verifier.md and execute.
+Compare test against test_matrix from scout_state. Identify gaps in states/actions/edges.
+Write coverage report to {results_dir}/{repo_key}/{issue_id}/state/step-5-coverage.json.
+Return ONLY the status block.
+"""
+)
+```
+
+Output: coverage report + gaps.
 Wait for completion before Step 6. If timeout: proceed with PARTIAL.
 
 ### Step 6: Synthesize Report
 
-Spawn agent: `qa-report-synthesizer`
-Input: test_results + verification + evidence + issue + concerns[]
-Output: report path + VERDICT
+Spawn sub-agent via Task tool:
+
+```
+Task(
+  subagent_type="qa-report-synthesizer",
+  description="Synthesize QA report",
+  prompt="""
+results_dir: {results_dir}/{repo_key}/{issue_id}
+issue_state: {results_dir}/{repo_key}/{issue_id}/state/step-1-issue.json
+scout_state: {results_dir}/{repo_key}/{issue_id}/state/step-2-scout.json
+run_state: {results_dir}/{repo_key}/{issue_id}/state/step-4-run.json
+coverage_state: {results_dir}/{repo_key}/{issue_id}/state/step-5-coverage.json
+concerns_log: {report_state.concerns}
+
+Read your agent file at .claude/agents/qa-report-synthesizer.md and execute.
+Write final report to {results_dir}/{repo_key}/{issue_id}/report.md.
+Compute VERDICT (PASS|FAIL|PARTIAL|ABORTED). Embed evidence links (video, trace).
+Return ONLY the status block with VERDICT.
+"""
+)
+```
+
+Output: report path + VERDICT.
+Emit `COMPLETE` marker after this step succeeds.
 
 ### Step 7: Post Results (if --post)
 
