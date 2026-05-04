@@ -61,7 +61,7 @@ repo_key: {repo_key}
 issue_id: {issue_id}
 project_context: {project_context_path_or_inline}
 
-Read your agent file at .claude/agents/<agent-name>.md and execute per spec.
+Execute per spec.
 Write any artifacts under {results_dir}/{repo_key}/{issue_id}/.
 Return ONLY the status block per references/status-protocol.md.
 """
@@ -339,7 +339,7 @@ Task(
 repo_path: {repo_path}
 results_dir: {results_dir}/{repo_key}/{issue_id}
 
-Read your agent file at .claude/agents/qa-context-extractor.md and execute per spec.
+Execute per spec.
 Detect tech stack, package manager (via lockfile), entry points, dev/build/test commands.
 Write project_context JSON to {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json.
 Return ONLY the status block per references/status-protocol.md.
@@ -371,7 +371,7 @@ manifest_path: {.qa-scan.yaml or null}
 results_dir: {results_dir}/{repo_key}/{issue_id}
 project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
 
-Read your agent file at .claude/agents/qa-env-bootstrap.md and execute the 8-step procedure.
+Execute the 8-step procedure.
 Use the package manager detected by qa-context-extractor (read project_context file). Never
 hardcode bun/npm/pnpm/yarn.
 Write the output contract JSON to {results_dir}/{repo_key}/{issue_id}/state/step-0a-env.json.
@@ -412,7 +412,7 @@ repo_key: {repo_key}
 results_dir: {results_dir}/{repo_key}/{issue_id}
 project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
 
-Read your agent file at .claude/agents/qa-issue-analyzer.md and execute.
+Execute per spec.
 Fetch issue from Linear/GitHub, extract feature_area + test_scenarios + expected_behavior.
 Write analysis JSON to {results_dir}/{repo_key}/{issue_id}/state/step-1-issue.json.
 Return ONLY the status block.
@@ -499,7 +499,7 @@ issue_state: {results_dir}/{repo_key}/{issue_id}/state/step-1-issue.json
 project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
 gitnexus_enabled: {true|false from config}
 
-Read your agent file at .claude/agents/qa-code-scout.md and execute.
+Execute per spec.
 Find files + flows + routes + shapes + test_matrix in one pass.
 Use GitNexus when available (preferred); fall back to grep/glob.
 Write scout JSON to {results_dir}/{repo_key}/{issue_id}/state/step-2-scout.json.
@@ -535,7 +535,7 @@ scout_state: {results_dir}/{repo_key}/{issue_id}/state/step-2-scout.json
 env_state: {results_dir}/{repo_key}/{issue_id}/state/step-0a-env.json
 project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
 
-Read your agent file at .claude/agents/qa-test-generator.md and execute.
+Execute per spec.
 Use base_url from env_state. Generate Playwright E2E spec covering all test_scenarios.
 Write spec to {results_dir}/{repo_key}/{issue_id}/evidence/test.spec.ts.
 Write generation summary to {results_dir}/{repo_key}/{issue_id}/state/step-3-test.json.
@@ -564,7 +564,7 @@ test_file: {results_dir}/{repo_key}/{issue_id}/evidence/test.spec.ts
 env_state: {results_dir}/{repo_key}/{issue_id}/state/step-0a-env.json
 playwright_config: scripts/playwright.config.ts
 
-Read your agent file at .claude/agents/qa-test-runner.md and execute.
+Execute per spec.
 Run Playwright with video + trace capture. Read base_url from env_state.
 Write run results to {results_dir}/{repo_key}/{issue_id}/state/step-4-run.json
 (include exit_code, pass/fail counts, trace_path, video_path, last_error if any).
@@ -593,7 +593,7 @@ scout_state: {results_dir}/{repo_key}/{issue_id}/state/step-2-scout.json
 run_state: {results_dir}/{repo_key}/{issue_id}/state/step-4-run.json
 test_file: {results_dir}/{repo_key}/{issue_id}/evidence/test.spec.ts
 
-Read your agent file at .claude/agents/qa-coverage-verifier.md and execute.
+Execute per spec.
 Compare test against test_matrix from scout_state. Identify gaps in states/actions/edges.
 Write coverage report to {results_dir}/{repo_key}/{issue_id}/state/step-5-coverage.json.
 Return ONLY the status block.
@@ -620,7 +620,7 @@ run_state: {results_dir}/{repo_key}/{issue_id}/state/step-4-run.json
 coverage_state: {results_dir}/{repo_key}/{issue_id}/state/step-5-coverage.json
 concerns_log: {report_state.concerns}
 
-Read your agent file at .claude/agents/qa-report-synthesizer.md and execute.
+Execute per spec.
 Write final report to {results_dir}/{repo_key}/{issue_id}/report.md.
 Compute VERDICT (PASS|FAIL|PARTIAL|ABORTED). Embed evidence links (video, trace).
 Return ONLY the status block with VERDICT.

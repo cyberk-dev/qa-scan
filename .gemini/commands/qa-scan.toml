@@ -1,28 +1,79 @@
-# QA Scan - Gemini CLI Slash Command
-# Usage: /qa-scan <issue-id>  or  /qa-scan --all
+# QA Scan - Gemini CLI Slash Command (v4.3+)
+# Usage: /qa-scan <issue-id> [--repo <key>] [--no-post]
+#
+# This slash command delegates to scripts/qa-scan-gemini.sh which runs each
+# pipeline step in a fresh `gemini -p` subprocess. Each sub-agent gets its own
+# clean context window — orchestrator state lives in bash + disk JSON files,
+# not in any LLM context. Mirrors the research-pipeline pattern that has been
+# proven to scale to 16+ cells without timeout.
+#
+# Why bash vs inline prompt:
+#   Gemini CLI does not have a Task() tool to spawn isolated sub-agent runtimes.
+#   Inlining all 8 sub-agents into one slash-command prompt collapses everything
+#   into a single conversation, hitting context limits around step 5-6.
+#   `gemini -p "<prompt>"` invocations from bash are isolated subprocesses → no
+#   shared context. State passes via JSON files under qa-results/{repo}/{issue}/.
 
-description = "Run QA scan pipeline for Linear/GitHub issues"
+description = "Run QA scan pipeline (bash orchestrator for context isolation)"
 
 prompt = """
-You are the qa-orchestrator agent. Execute the full QA pipeline.
+Execute the qa-scan pipeline for issue ``.
 
-## Input
-Issue or command: ``
+This slash command delegates to a bash orchestrator that runs each step in an
+isolated `gemini -p` subprocess so sub-agents do not share context.
 
-## Configuration
-Read: .agents/qa-scan/config/qa.config.yaml
+## Required action
 
-## Workflow
-Follow the pipeline in .agents/qa-scan/workflow.md
+Run this exact command via the Bash tool, streaming output to the user:
 
-## Agent Instructions
-@{.gemini/agents/qa-orchestrator.md}
+```bash
+bash .agents/qa-scan/scripts/qa-scan-gemini.sh
+```
+
+Pass any extra flags (e.g. `--repo skin-agent-fe`, `--no-post`) verbatim from
+the user's argument list.
+
+## What the script does
+
+The script chains 8 fresh `gemini -p` calls, one per pipeline step:
+
+1. `qa-context-extractor` — detect tech stack + package manager
+2. `qa-env-bootstrap`     — install deps (lockfile-aware), start dev server
+3. `qa-issue-analyzer`    — fetch issue, extract test scenarios
+4. `qa-code-scout`        — find files, flows, routes, shapes (GitNexus or grep)
+5. `qa-test-generator`    — write Playwright spec to evidence/test.spec.ts
+6. `qa-test-runner`       — run Playwright with video + trace
+7. `qa-coverage-verifier` — diff test against scout's test_matrix
+8. `qa-report-synthesizer` — emit final VERDICT report
+
+State passes between steps via JSON files at:
+`{results_dir}/{repo_key}/{issue_id}/state/step-{n}-{name}.json`
+
+## Output
+
+Watch for these stdout markers:
+
+- `STEP_BEGIN step=<n> name=<agent>`
+- `STEP_COMPLETE step=<n> name=<agent> status=<DONE|...> output=<path>`
+- `STEP_FAILED step=<n> name=<agent> reason=<text>`
+- `PIPELINE_DONE verdict=<PASS|FAIL|PARTIAL|ABORTED> report=<path>`
+
+After `PIPELINE_DONE`, read the final report file and present a concise summary
+to the user (verdict + 3-5 bullet evidence points + report path). Do NOT
+re-run any sub-agent yourself — the bash script already handled them.
+
+## Failure handling
+
+- `STEP_FAILED` mid-pipeline → script aborts with exit 1. Read the per-step
+  log at `{results_dir}/{repo}/{issue}/state/.{agent}.log` and report the root
+  cause to the user. Offer: (1) fix manually + retry, (2) skip step + PARTIAL,
+  (3) abort.
+- `gemini` not in PATH → tell user to install Gemini CLI >= 0.40.
 
 ## Arguments
-- Single issue: `/qa-scan SKI-101` or `/qa-scan SKIN-101`
-- Batch mode: `/qa-scan --all`
-- With repo filter: `/qa-scan --all --repo skin-agent-fe`
-- Post report: `/qa-scan SKI-101 --post`
 
-Execute the pipeline now.
+- Single issue: `/qa-scan SKI-101`
+- With repo:    `/qa-scan SKI-101 --repo test-app`
+- Skip post:    `/qa-scan SKI-101 --no-post`
+- Batch (NYI):  `/qa-scan --all` — defer until v5.0.0
 """

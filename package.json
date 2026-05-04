@@ -1,6 +1,6 @@
 {
   "name": "qa-scan",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "private": true,
   "scripts": {
     "setup": "bash scripts/install.sh",

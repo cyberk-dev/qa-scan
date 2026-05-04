@@ -2,6 +2,39 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.3.0] — 2026-05-04
+
+### Added
+
+- **`scripts/qa-scan-gemini.sh`** — bash orchestrator for the Gemini CLI runtime. Chains 8 fresh `gemini -p` subprocesses, one per pipeline step. Each sub-agent gets its own clean context window. State passes between steps via JSON files at `{results_dir}/{repo}/{issue}/state/step-{n}-{name}.json`. Mirrors the `run-cell-v3.sh` pattern from the research pipeline (proven to scale).
+- Stdout markers: `STEP_BEGIN`, `STEP_COMPLETE`, `STEP_FAILED`, `PIPELINE_DONE` — parseable from any caller.
+
+### Changed
+
+- **`.gemini/commands/qa-scan.toml`** — slash command `/qa-scan` no longer inlines the orchestrator agent into a single prompt. It now instructs Gemini to run `bash .agents/qa-scan/scripts/qa-scan-gemini.sh` via the Bash tool. The bash script handles all spawning. Result: each Gemini sub-agent invocation starts with empty context, which prevents the timeout/cancel observed in v4.0–4.2 around step 5–6.
+- **`agents/qa-orchestrator.md`** (Claude path) — removed redundant `Read your agent file at .claude/agents/<name>.md and ` line from all 8 Task() prompts. Claude resolves the agent definition from `subagent_type` automatically; the explicit path was harmful path coupling that broke portability and double-loaded agent files.
+
+### Why
+
+User report: pulling v4.2.0 to a Gemini sandbox still timed out, because the v4.2.0 fix only updated the Claude orchestrator (which uses Task() invocations Gemini does not support). Gemini path needed its own architecture. Bash chaining mirrors the proven research-pipeline approach: orchestrator state lives in shell variables and disk, never in any LLM context.
+
+### Migration from 4.2.x
+
+- **Claude users:** no behavior change. Same `/qa-scan SKI-101`. Path coupling cleanup is internal.
+- **Gemini users:** same `/qa-scan SKI-101` invocation; first call dispatches to the bash orchestrator. Requires `gemini` CLI ≥ 0.40 in PATH. Each step runs in its own subprocess so context bloat no longer compounds.
+
+### Upgrade
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cyberk-dev/qa-scan/main/install.sh | bash -s -- --non-interactive
+```
+
+Verify Gemini installer:
+```bash
+ls .agents/qa-scan/scripts/qa-scan-gemini.sh   # script present
+grep "qa-scan-gemini.sh" .gemini/commands/qa-scan.toml   # slash command points to bash
+```
+
 ## [4.2.0] — 2026-05-04
 
 ### Changed
