@@ -2,6 +2,21 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.0.2] — 2026-05-04
+
+### Fixed
+
+- **Workspace runtime `references/`, `fixtures/`, `scripts/` not synced on install** — `install.sh` now copies bundled runtime to `$WORKSPACE/.agents/qa-scan/` so agents can resolve `references/X.md` paths at runtime. Prior installs left workspace `.agents/qa-scan/references/` stale (e.g. missing `env-bootstrap.md`, `web3-testing.md`, `status-protocol.md`, `mcp-diagnostics.md`, `gitnexus-flows.md`, `project-context.md`), breaking `qa-env-bootstrap` and `qa-context-extractor` agent reference loads.
+- **Source drift consolidated** — `references/env-bootstrap.md` moved into `.agents/qa-scan/references/` (canonical location). Both legacy `references/` and `.agents/qa-scan/references/` accepted as source by installer (canonical wins).
+
+### Upgrade
+
+Re-run installer in your workspace:
+```bash
+bash qa-scan-repo/install.sh --non-interactive
+```
+Then verify: `ls .agents/qa-scan/references/` should contain `env-bootstrap.md`.
+
 ## [4.0.1] — 2026-04-22
 
 ### Fixed

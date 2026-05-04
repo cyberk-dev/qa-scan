@@ -580,6 +580,33 @@ fi
 # ══════════════════════════════════════════════
 header "Agents"
 
+# Sync bundled runtime (references + fixtures + scripts + config) to workspace .agents/qa-scan/
+# Agents reference these files at runtime via "references/X.md" relative path.
+# Skip when running standalone in repo (IS_REPO=true with QA_DIR=SCRIPT_DIR=WORKSPACE).
+if [ "$QA_DIR" != "$WORKSPACE/.agents/qa-scan" ]; then
+  RUNTIME_DEST="$WORKSPACE/.agents/qa-scan"
+  mkdir -p "$RUNTIME_DEST"
+  # Prefer .agents/qa-scan/* as canonical source if present, else fall back to root references/
+  if [ -d "$QA_DIR/.agents/qa-scan/references" ]; then
+    mkdir -p "$RUNTIME_DEST/references"
+    cp -R "$QA_DIR/.agents/qa-scan/references/." "$RUNTIME_DEST/references/"
+  elif [ -d "$QA_DIR/references" ]; then
+    mkdir -p "$RUNTIME_DEST/references"
+    cp -R "$QA_DIR/references/." "$RUNTIME_DEST/references/"
+  fi
+  # fixtures (web3 wallet, etc.)
+  if [ -d "$QA_DIR/.agents/qa-scan/fixtures" ]; then
+    mkdir -p "$RUNTIME_DEST/fixtures"
+    cp -R "$QA_DIR/.agents/qa-scan/fixtures/." "$RUNTIME_DEST/fixtures/"
+  fi
+  # scripts (verify.sh, etc.)
+  if [ -d "$QA_DIR/scripts" ]; then
+    mkdir -p "$RUNTIME_DEST/scripts"
+    cp -R "$QA_DIR/scripts/." "$RUNTIME_DEST/scripts/"
+  fi
+  info "Runtime references + fixtures + scripts synced → .agents/qa-scan/"
+fi
+
 # Claude Code
 if [ "$HAS_CLAUDE" = true ]; then
   mkdir -p "$WORKSPACE/.claude/agents" "$WORKSPACE/.claude/skills/qa-scan" "$WORKSPACE/.claude/rules/qa-scan"
