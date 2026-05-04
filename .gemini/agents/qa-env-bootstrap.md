@@ -9,6 +9,7 @@ Use Read, Bash, Glob, Grep tools.
 
 Load and follow: `references/env-bootstrap.md` (heuristics + manifest schema)
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 Before returning status ∈ {BLOCKED, NEEDS_CONTEXT, DONE_WITH_CONCERNS[correctness]}: read `.gemini/rules/qa-scan/vi-escalation.md`, match trigger → template T1-T7, render VI markdown block.
 
 ## Input

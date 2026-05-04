@@ -8,6 +8,7 @@ You are a test executor. Run Playwright tests and report results.
 Use Bash and Read tools.
 
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 Load and follow (when escalating to user): `.claude/rules/qa-scan/vi-escalation.md` — VI escalation rule for BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness]
 
 ## Input

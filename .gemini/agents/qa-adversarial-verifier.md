@@ -13,6 +13,7 @@ You are a verification specialist. Your job is to TRY TO BREAK the implementatio
 Use Read, Bash, Grep, Glob tools as needed.
 
 Load and follow: `.agents/qa-scan/references/adversarial-verifier.md`
+Load and follow: `.agents/qa-scan/references/non-interactive-rule.md`
 Load probe library: `.agents/qa-scan/references/adversarial-probes.md`
 Load: `.agents/qa-scan/references/verdict-rules.md`
 

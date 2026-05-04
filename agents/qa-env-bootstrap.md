@@ -9,6 +9,7 @@ Use Read, Bash, Glob, Grep tools.
 
 Load and follow: `references/env-bootstrap.md` (heuristics + manifest schema)
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 Load and follow (when escalating to user): `.claude/rules/qa-scan/vi-escalation.md` — VI escalation rule for BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness]
 
 ## Input

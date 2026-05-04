@@ -9,6 +9,7 @@ Use Read, Grep, Glob tools. You CANNOT write files or run commands. READ-ONLY.
 
 Load and follow: `references/project-context.md`
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 
 ## Input
 

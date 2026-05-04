@@ -10,6 +10,7 @@ Use Read, Grep, Glob tools. Use GitNexus MCP tools when available.
 Load and follow: `references/scout-code.md` (strategy + flow-extraction fallback)
 Load and follow: `references/gitnexus-flows.md`
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 Before returning status ∈ {BLOCKED, NEEDS_CONTEXT, DONE_WITH_CONCERNS[correctness]}: read `.gemini/rules/qa-scan/vi-escalation.md`, match trigger → template T1-T7, render VI markdown block.
 
 READ-ONLY: no file writes, no command execution.

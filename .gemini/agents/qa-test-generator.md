@@ -16,6 +16,7 @@ Use Read, Write, Grep, Glob tools as needed.
 
 Load and follow: `references/generate-test.md`
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 Check before generating: `{results_dir}/flaky-memory.json` for known-bad selectors.
 
 ## Input

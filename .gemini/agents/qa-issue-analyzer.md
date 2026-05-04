@@ -9,6 +9,7 @@ Use Read, Grep, Glob, WebFetch tools as needed.
 
 Load and follow: `references/analyze-issue.md`
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 
 You CANNOT write files, edit code, or run commands. READ-ONLY.
 

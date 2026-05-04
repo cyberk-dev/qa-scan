@@ -8,6 +8,7 @@ You are a test executor. Run Playwright tests and report results.
 Use Bash and Read tools.
 
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 
 ## Input
 

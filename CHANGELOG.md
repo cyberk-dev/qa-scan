@@ -2,6 +2,43 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.4.0] — 2026-05-04
+
+### Added
+
+- **Non-interactive subprocess rule** (`references/non-interactive-rule.md`) — sub-agents must NEVER call `AskUserQuestion` or wait for stdin. They emit `escalation` JSON payload with question + options and return `NEEDS_CONTEXT`/`BLOCKED`. The orchestrator (Claude Task or bash chain) is the only layer allowed to interact with the user. All 18 sub-agent files (Claude + Gemini) now `Load and follow` this rule.
+- **Pipeline manifest** (`references/qa-pipeline.yaml`) — single source of truth declaring all 8 steps, agent names, output filenames, input dependencies, and on_failure policy. Both runtimes can read this; bash orchestrator now drives off it.
+- **T1–T7 template files** (`references/templates/T{1..7}.md`) — discrete reusable escalation templates extracted from `vi-escalation.md`. Bash and Claude can both reference by ID instead of inlining text.
+
+### Changed
+
+- **`scripts/qa-scan-gemini.sh` rewritten manifest-driven.** Steps are no longer hard-coded; the script reads `qa-pipeline.yaml` and loops. Adds `NEEDS_CONTEXT` retry loop with user prompt (max `QA_SCAN_MAX_RETRIES` = 3 per step), `BLOCKED` escalation surface via T-template ID, and `QA_SCAN_NONINTERACTIVE=1` env flag for CI auto-abort.
+- **New stdout markers:** `NEEDS_USER_INPUT`, `STEP_RETRY` — parseable by callers chaining the script.
+- **Dependency check upfront:** script aborts immediately if `gemini` / `python3` / `jq` not in PATH (was failing mid-pipeline before).
+
+### Why
+
+User feedback after v4.3.0: sub-agents that hit ambiguity (e.g. low-confidence issue analysis) tried to call `AskUserQuestion` from inside their subprocess context, hanging the parent bash chain because subprocess stdin is closed. Same risk under Claude `Task()` — the spawned subagent has no dialog channel back. Fix: standardize on disk-based escalation payload + orchestrator-side prompts. KISS + DRY: the manifest replaces 8 hand-coded step blocks; the templates dir replaces inline T-text duplication.
+
+### Migration from 4.3.x
+
+- **Sub-agent authors:** if you previously emitted user prompts inline, switch to populating `escalation` in your output JSON (see `references/non-interactive-rule.md`). Loading that rule is now mandatory (already added to all bundled agents).
+- **Bash orchestrator users:** behavior unchanged for the happy path; new behavior on NEEDS_CONTEXT (now retries with user input instead of aborting). Set `QA_SCAN_NONINTERACTIVE=1` in CI.
+- **Pipeline customization:** to add/remove/reorder steps, edit `references/qa-pipeline.yaml` instead of touching the bash script.
+
+### Upgrade
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cyberk-dev/qa-scan/main/install.sh | bash -s -- --non-interactive
+```
+
+Verify:
+```bash
+ls .agents/qa-scan/references/qa-pipeline.yaml
+ls .agents/qa-scan/references/templates/T1.md
+grep -c "non-interactive-rule" .claude/agents/qa-context-extractor.md   # expect 1
+```
+
 ## [4.3.0] — 2026-05-04
 
 ### Added

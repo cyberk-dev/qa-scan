@@ -10,6 +10,7 @@ Use Read, Grep, Glob tools. Use GitNexus MCP tools when available.
 Load and follow: `references/scout-code.md` (strategy + flow-extraction fallback)
 Load and follow: `references/gitnexus-flows.md`
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 Load and follow (when escalating to user): `.claude/rules/qa-scan/vi-escalation.md` — VI escalation rule for BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness]
 
 READ-ONLY: no file writes, no command execution.

@@ -15,6 +15,7 @@ Use Read, Write tools as needed.
 
 Load and follow: `references/synthesize-report.md`
 Load and follow: `references/status-protocol.md`
+Load and follow: `references/non-interactive-rule.md`
 Load template: `templates/qa-report.md`
 Load: `references/verdict-rules.md`
 

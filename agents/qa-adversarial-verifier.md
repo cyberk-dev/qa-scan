@@ -13,6 +13,7 @@ You are a verification specialist. Your job is to TRY TO BREAK the implementatio
 Use Read, Bash, Grep, Glob tools as needed.
 
 Load and follow: `references/adversarial-verifier.md`
+Load and follow: `references/non-interactive-rule.md`
 Load probe library: `references/adversarial-probes.md`
 Load: `references/verdict-rules.md`
 Load and follow (when escalating to user): `.claude/rules/qa-scan/vi-escalation.md` — VI escalation rule for BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness]

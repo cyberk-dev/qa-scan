@@ -1,0 +1,113 @@
+# qa-scan pipeline manifest — single source of truth for both runtimes.
+#
+# Consumers:
+#   - scripts/qa-scan-gemini.sh    (bash orchestrator, Gemini CLI runtime)
+#   - agents/qa-orchestrator.md    (Claude Task() runtime — references step ids only)
+#
+# Schema:
+#   step:        unique id (string, also used as filename suffix)
+#   name:        sub-agent name (matches .claude/agents/<name>.md and .gemini/agents/<name>.md)
+#   description: human-readable label, shown in stdout markers
+#   outfile:     filename under {results_dir}/{repo_key}/{issue_id}/state/
+#                EXCEPT step 6 which writes to {results_dir}/{repo_key}/{issue_id}/report.md
+#   inputs:      list of named inputs the sub-agent needs in its prompt body
+#                Each input maps to a path/value the orchestrator resolves
+#   on_failure:  abort (default) | partial — bash sets verdict=PARTIAL and exits 0
+#   max_retries: integer, default 3 — applies to NEEDS_CONTEXT only
+
+steps:
+
+  - step: "0"
+    name: qa-context-extractor
+    description: Extract project context (stack, package manager, commands)
+    outfile: step-0-context.json
+    inputs:
+      - repo_path
+      - repo_key
+      - results_dir
+    on_failure: abort
+
+  - step: "0a"
+    name: qa-env-bootstrap
+    description: Install deps + start dev server (lockfile-aware)
+    outfile: step-0a-env.json
+    inputs:
+      - repo_path
+      - repo_key
+      - results_dir
+      - project_context: state/step-0-context.json
+      - manifest_path: optional   # {repo_path}/.qa-scan.yaml
+    on_failure: abort
+
+  - step: "1"
+    name: qa-issue-analyzer
+    description: Fetch issue + extract test scenarios
+    outfile: step-1-issue.json
+    inputs:
+      - issue_id
+      - repo_key
+      - results_dir
+      - project_context: state/step-0-context.json
+    on_failure: abort
+
+  - step: "2"
+    name: qa-code-scout
+    description: Find files, flows, routes, shapes (GitNexus or grep)
+    outfile: step-2-scout.json
+    inputs:
+      - repo_path
+      - results_dir
+      - issue_state: state/step-1-issue.json
+      - project_context: state/step-0-context.json
+    on_failure: abort
+
+  - step: "3"
+    name: qa-test-generator
+    description: Generate Playwright spec
+    outfile: step-3-test.json
+    extra_outputs:
+      - evidence/test.spec.ts
+    inputs:
+      - issue_id
+      - results_dir
+      - issue_state: state/step-1-issue.json
+      - scout_state: state/step-2-scout.json
+      - env_state: state/step-0a-env.json
+      - project_context: state/step-0-context.json
+      - test_file_target: evidence/test.spec.ts
+    on_failure: abort
+
+  - step: "4"
+    name: qa-test-runner
+    description: Run Playwright with video + trace
+    outfile: step-4-run.json
+    inputs:
+      - results_dir
+      - test_file: evidence/test.spec.ts
+      - env_state: state/step-0a-env.json
+      - playwright_config: scripts/playwright.config.ts
+    on_failure: abort
+
+  - step: "5"
+    name: qa-coverage-verifier
+    description: Diff test against test_matrix
+    outfile: step-5-coverage.json
+    inputs:
+      - results_dir
+      - scout_state: state/step-2-scout.json
+      - run_state: state/step-4-run.json
+      - test_file: evidence/test.spec.ts
+    on_failure: partial   # missing coverage doesn't abort the whole pipeline
+
+  - step: "6"
+    name: qa-report-synthesizer
+    description: Emit final VERDICT report
+    outfile: report.md          # special: written at the issue root, not state/
+    write_to_root: true
+    inputs:
+      - results_dir
+      - issue_state: state/step-1-issue.json
+      - scout_state: state/step-2-scout.json
+      - run_state: state/step-4-run.json
+      - coverage_state: state/step-5-coverage.json
+    on_failure: partial
