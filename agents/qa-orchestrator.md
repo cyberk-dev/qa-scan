@@ -14,6 +14,12 @@ References: `references/` (agents load these themselves).
 Status Protocol: `references/status-protocol.md`
 VI Escalation Rule: `.claude/rules/qa-scan/vi-escalation.md` (mandatory when status ∈ BLOCKED/NEEDS_CONTEXT/CONCERNS[correctness])
 
+## Hard Rules
+
+- **NEVER run install commands during pre-flight.** Stack/package-manager is unknown until `qa-context-extractor` (Step 0) reads the lockfile. All install operations belong to `qa-env-bootstrap` (Step 0a), which is lockfile-aware (bun/pnpm/npm/yarn).
+- **NEVER hardcode `bun install`, `npm install`, `pnpm install`, or `yarn install` in any agent prompt.** Use the install command emitted by `qa-context-extractor` (`project_context.commands.install`) or let `qa-env-bootstrap` detect it.
+- Pre-flight checks DETECT capability only (Linear MCP, GitNexus, Playwright binary). Missing tools mark `needs_install` and defer to Step 0a, except Linear (required for issue fetch — escalates immediately if down).
+
 **Results folder:** `{config.defaults.results_dir}` (common folder at workspace level)
 - Pattern: `{results_dir}/{repo_key}/{issue_id}/`
 - Example: `qa-results/test-app/SKI-5/`
@@ -175,30 +181,37 @@ except error:
         → Log: "GitNexus unavailable: {diagnosis.root_cause}. Using pattern-based scout."
         → Continue (fallback to Glob/Grep)
 
-# 3. Check Playwright (required for running tests)
+# 3. Check Playwright (required for running tests) — DETECT ONLY, never install
+#
+# RULE (v4.1+): Pre-flight MUST NOT run any install command. Project package
+# manager is unknown until Step 0 (qa-context-extractor) detects the lockfile.
+# If Playwright missing here, mark `needs_install` and let Step 0a
+# (qa-env-bootstrap) install with the correct manager (bun/pnpm/npm/yarn).
+#
+# Why: hardcoding `bun install` (or `npm install`) in pre-flight breaks repos
+# using a different manager and can corrupt lockfiles. Stack-aware install
+# is the responsibility of qa-env-bootstrap, which already does lockfile
+# detection (see references/env-bootstrap.md).
 try:
     result = bash("npx playwright --version")
     preflight_state.playwright = "ok"
 except error:
-    preflight_state.playwright = "error"
+    preflight_state.playwright = "needs_install"  # NOT "error"
     
-    # DEBUG-FIRST: Run diagnostics
+    # DEBUG-FIRST: Run diagnostics for telemetry / user-facing report only
     diagnosis = run_playwright_diagnostics()
     preflight_state.diagnostics.playwright = diagnosis
     
-    # Attempt auto-fix
-    if diagnosis.root_cause == "not_installed":
-        bash("bun install && npx playwright install chromium")
-        if verify_playwright():
-            preflight_state.playwright = "ok"
-    
-    # If still failing: escalate WITH diagnosis
-    if preflight_state.playwright != "ok":
-        → Present diagnosis report
-        → Options:
-          [1] I'll fix manually (see diagnosis)
-          [2] Skip test execution (PARTIAL verdict)
-          [3] Abort
+    # NO auto-fix here. Continue to Step 0 → Step 0a will handle install.
+    → Log: "Playwright not installed. Deferring install to qa-env-bootstrap."
+
+# 3a. (After Step 0a runs) verify Playwright is now installed
+# qa-env-bootstrap MUST install dev deps using project's lockfile-detected
+# manager. If still missing post-bootstrap → escalate (T1 template) with
+# diagnosis. Options:
+#   [1] User fixes manually (paste diagnosis)
+#   [2] Skip test execution (PARTIAL verdict)
+#   [3] Abort
 ```
 
 **User Escalation Format (with Diagnosis):**

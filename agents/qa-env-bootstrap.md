@@ -31,9 +31,16 @@ JSON per `references/env-bootstrap.md` → Output Contract. Plus status block.
 - Monorepo detected + no manifest.dev.cwd → **BLOCKED T4** ("Monorepo cần manifest")
 
 ### 2. Install dependencies
-- Detect manager via lockfile
+- **Detect manager via lockfile (REQUIRED — never assume):**
+  - `bun.lock` / `bun.lockb` → `bun`
+  - `pnpm-lock.yaml` → `pnpm`
+  - `yarn.lock` → `yarn`
+  - `package-lock.json` → `npm`
+  - None of the above + `package.json` exists → fall back to manager declared in `project_context.commands.install`; if absent → **BLOCKED T4** ("Cannot detect package manager")
+- Prefer `project_context.commands.install` if provided (orchestrator passes this from qa-context-extractor output) — it already encodes the right manager
 - Skip if `node_modules/.package-lock.json` newer than lockfile
 - Run install command (streaming output to `{results_dir}/.install.log`)
+- After install: verify Playwright available (`{manager} exec playwright --version` or `npx playwright --version`). If missing AND `project_context.testing.playwright != false`, install it as dev dep using detected manager (e.g. `bun add -d @playwright/test && bun exec playwright install chromium`). Never substitute manager.
 - Non-zero exit → **BLOCKED T4** (show last 20 lines log)
 
 ### 3. Setup .env

@@ -2,6 +2,31 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.1.0] — 2026-05-04
+
+### Changed
+
+- **`qa-orchestrator` pre-flight no longer runs install commands.** Pre-flight now DETECTS only (Linear MCP, GitNexus, Playwright binary). If Playwright missing → mark `needs_install` and defer to `qa-env-bootstrap` (Step 0a) which is lockfile-aware. Prior behavior hardcoded `bun install` regardless of repo's package manager, breaking pnpm/npm/yarn projects.
+- **`qa-env-bootstrap` Step 2 (install) made lockfile-mandatory.** Detection logic now explicit per manager (`bun.lock`/`bun.lockb` → bun, `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `package-lock.json` → npm). Falls back to `project_context.commands.install` when no lockfile matches; BLOCKED T4 if neither resolvable. Prefers `project_context.commands.install` when present.
+- **`qa-env-bootstrap` now installs Playwright dev dep on demand** using the detected manager (e.g. `bun add -d @playwright/test`). Never substitutes the manager.
+
+### Added
+
+- `qa-orchestrator.md` "Hard Rules" section explicitly forbids hardcoded `bun install` / `npm install` / `pnpm install` / `yarn install` in any agent prompt. Forces stack-aware install path through Step 0 → Step 0a.
+
+### Why
+
+Live runtime observed orchestrator running `npm install --save-dev @playwright/test` in pre-flight on a `bun`-based repo, corrupting context and forcing user cancellation. Root cause: pre-flight ran before `qa-context-extractor` (which detects package manager) → no way to choose the correct manager. Fix moves all install responsibility to Step 0a where lockfile detection already exists.
+
+### Upgrade
+
+Re-run installer in your workspace:
+```bash
+bash qa-scan-repo/install.sh --non-interactive
+```
+
+No config changes required. Behavior is backward-compatible — existing scans continue to work, but now correctly use the project's package manager instead of hardcoded `bun`.
+
 ## [4.0.2] — 2026-05-04
 
 ### Fixed
