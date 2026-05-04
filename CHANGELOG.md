@@ -2,6 +2,52 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.5.0] — 2026-05-04
+
+### Added
+
+- **`qa-pipeline-planner` sub-agent** (Step 1b) — reasons about issue scope + project context, emits an `execution_plan` JSON deciding which **selectable** steps to run for this issue. Lives between `qa-issue-analyzer` (Step 1) and `qa-env-bootstrap` (Step 0a) so it can advise skipping the bootstrap when there's no runtime to test (doc-only, type-only, lint-only fixes).
+- **`always_run` flag** on each manifest step (`references/qa-pipeline.yaml`). Always-run = `[0, 1, 1b, 6]` (context, issue, planner, report). Selectable = `[0a, 2, 3, 4, 5]`.
+- **`STEP_SKIPPED step=<id> name=<agent> reason=<text>`** stdout marker — emitted by bash orchestrator and Claude orchestrator for steps the planner chose to skip.
+- **`EXECUTION_PLAN selected=<csv>`** marker — printed once after Step 1b runs, listing which selectable steps will execute.
+
+### Changed
+
+- **Manifest order reshuffled** to support the planner: `[0, 1, 1b, 0a, 2, 3, 4, 5, 6]`. Step ids preserved (no on-disk filename changes) — only YAML order changed. Bash and Claude orchestrators both iterate in declared order.
+- **`scripts/qa-scan-gemini.sh`** filters selectable steps against the planner's `execution_plan`. Hard rule: if planner doesn't emit `execution_plan` (malformed output) → `PIPELINE_DONE verdict=ABORTED reason=planner_no_plan`.
+- **`agents/qa-orchestrator.md`** (Claude path) gains a Step 1b Task() block + filtering rule mirroring bash behavior.
+- **Step 6 inputs** now include `planner_state: state/step-1b-plan.json` so the final report can document which steps were skipped and why.
+
+### Why
+
+User feedback after v4.4.0: manifest was static — every issue ran all 8 steps regardless of scope. A doc-only fix would still install dev deps + start a server + run Playwright (~2 min wasted). The planner adds task-aware reasoning: read issue + context, output a subset of steps that actually matter for THIS issue. Approx savings:
+
+| Issue type             | Steps skipped         | Time saved |
+|------------------------|-----------------------|------------|
+| Doc / type-only        | 0a, 3, 4, 5           | ~3 min     |
+| Single-component fix   | 5                     | ~30 s      |
+| Critical security fix  | (none — full coverage)| 0          |
+| Multi-component refactor | (none)              | 0          |
+
+### Migration from 4.4.x
+
+- **Sub-agent contracts unchanged.** Existing 8 sub-agents work as-is.
+- **Pipeline customization:** to skip a step always, set `always_run: false` and the planner can decide; if you want a hard skip regardless of planner, remove the step from the manifest entirely.
+- **CI / non-interactive:** planner emits its plan without prompting. `QA_SCAN_NONINTERACTIVE=1` still applies for downstream steps' BLOCKED handling.
+- **Backward path:** if you want pre-4.5 behavior (always run everything), set `always_run: true` on all manifest steps. Planner will still run but its plan is ignored when no step is selectable.
+
+### Upgrade
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cyberk-dev/qa-scan/main/install.sh | bash -s -- --non-interactive
+```
+
+Verify:
+```bash
+ls .claude/agents/qa-pipeline-planner.md
+grep -c "always_run" .agents/qa-scan/references/qa-pipeline.yaml   # expect 9
+```
+
 ## [4.4.0] — 2026-05-04
 
 ### Added

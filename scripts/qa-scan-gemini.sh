@@ -360,12 +360,51 @@ EOF
 mark "PIPELINE_BEGIN issue=$ISSUE_ID repo=$REPO_KEY results_dir=$RESULTS_DIR"
 
 STEP_IDS="$(python3 -c "import yaml; print(' '.join(s['step'] for s in yaml.safe_load(open('$MANIFEST_FILE'))['steps']))")"
+PLANNER_OUTFILE="$STATE_DIR/step-1b-plan.json"
+EXECUTION_PLAN=""   # populated after planner step runs; CSV of selectable step ids the planner chose
+
+# Lookup helpers — read manifest field for a given step id.
+manifest_field() {
+  local STEP="$1" FIELD="$2" DEFAULT="${3:-}"
+  python3 -c "
+import yaml
+m = yaml.safe_load(open('$MANIFEST_FILE'))
+s = next(s for s in m['steps'] if s['step']=='$STEP')
+v = s.get('$FIELD', '$DEFAULT')
+print(v)"
+}
+
+# True if step should run: always_run OR present in execution_plan.
+should_run_step() {
+  local STEP="$1"
+  local ALWAYS
+  ALWAYS="$(manifest_field "$STEP" "always_run" "False")"
+  if [[ "$ALWAYS" == "True" ]]; then
+    return 0
+  fi
+  # Selectable step — gate on planner's execution_plan
+  if [[ -z "$EXECUTION_PLAN" ]]; then
+    # Planner hasn't run yet — should never happen if step ordering is correct
+    return 0
+  fi
+  if [[ ",$EXECUTION_PLAN," == *",$STEP,"* ]]; then
+    return 0
+  fi
+  return 1
+}
 
 for STEP in $STEP_IDS; do
-  AGENT="$(python3 -c "import yaml; print(next(s['name'] for s in yaml.safe_load(open('$MANIFEST_FILE'))['steps'] if s['step']=='$STEP'))")"
-  OUTNAME="$(python3 -c "import yaml; print(next(s['outfile'] for s in yaml.safe_load(open('$MANIFEST_FILE'))['steps'] if s['step']=='$STEP'))")"
-  WRITE_TO_ROOT="$(python3 -c "import yaml; print(next(s.get('write_to_root', False) for s in yaml.safe_load(open('$MANIFEST_FILE'))['steps'] if s['step']=='$STEP'))")"
-  ON_FAIL="$(python3 -c "import yaml; print(next(s.get('on_failure', 'abort') for s in yaml.safe_load(open('$MANIFEST_FILE'))['steps'] if s['step']=='$STEP'))")"
+  AGENT="$(manifest_field "$STEP" "name")"
+  OUTNAME="$(manifest_field "$STEP" "outfile")"
+  WRITE_TO_ROOT="$(manifest_field "$STEP" "write_to_root" "False")"
+  ON_FAIL="$(manifest_field "$STEP" "on_failure" "abort")"
+
+  if ! should_run_step "$STEP"; then
+    SKIP_REASON="$(jq -r --arg s "$STEP" '.skipped[]? | select(.step==$s) | .reason' "$PLANNER_OUTFILE" 2>/dev/null | head -1)"
+    [[ -z "$SKIP_REASON" ]] && SKIP_REASON="not_selected_by_planner"
+    mark "STEP_SKIPPED step=$STEP name=$AGENT reason=$SKIP_REASON"
+    continue
+  fi
 
   if [[ "$WRITE_TO_ROOT" == "True" ]]; then
     OUTFILE="$RESULTS_DIR/$OUTNAME"
@@ -382,6 +421,17 @@ for STEP in $STEP_IDS; do
     fi
     mark "PIPELINE_DONE verdict=ABORTED reason=step-${STEP}_failed"
     exit 1
+  fi
+
+  # After the planner step, capture its execution_plan into a bash CSV string
+  if [[ "$STEP" == "1b" && -f "$PLANNER_OUTFILE" ]]; then
+    EXECUTION_PLAN="$(jq -r '.execution_plan | join(",")' "$PLANNER_OUTFILE" 2>/dev/null || echo "")"
+    if [[ -z "$EXECUTION_PLAN" ]]; then
+      mark "STEP_FAILED step=1b name=qa-pipeline-planner reason=missing_execution_plan_in_output"
+      mark "PIPELINE_DONE verdict=ABORTED reason=planner_no_plan"
+      exit 1
+    fi
+    mark "EXECUTION_PLAN selected=$EXECUTION_PLAN"
   fi
 done
 

@@ -484,6 +484,34 @@ gitnexus analyze --incremental {repo_path}
 
 Skip if `gitnexus: false` in config.
 
+### Step 1b: Pipeline Planner (NEW in v4.5)
+
+Spawn sub-agent via Task tool BEFORE running env-bootstrap (Step 0a) or any selectable step:
+
+```
+Task(
+  subagent_type="qa-pipeline-planner",
+  description="Plan execution",
+  prompt="""
+results_dir: {results_dir}/{repo_key}/{issue_id}
+issue_state: {results_dir}/{repo_key}/{issue_id}/state/step-1-issue.json
+project_context: {results_dir}/{repo_key}/{issue_id}/state/step-0-context.json
+output_file: {results_dir}/{repo_key}/{issue_id}/state/step-1b-plan.json
+
+Decide which selectable steps to include for this issue. Selectable = [0a, 2, 3, 4, 5].
+Always-run = [0, 1, 1b, 6]. Output execution_plan JSON per agent spec. Be conservative
+(prefer including a step on uncertain calls). Return ONLY the status block.
+"""
+)
+```
+
+After Task() returns, parse `execution_plan` from `step-1b-plan.json`. For each
+subsequent selectable step (Step 0a, 2, 3, 4, 5) — only spawn it if its id is in
+`execution_plan`. Otherwise emit `STEP_SKIPPED step=<id> reason=<reason from skipped[]>`
+and proceed to the next step. Step 6 (report-synthesizer) always runs and must read
+`step-1b-plan.json` so the report can document which steps were skipped + the planner's
+rationale.
+
 ### Step 2: Scout Code + Flow + Routes + Shapes (v4 unified)
 
 Spawn sub-agent via Task tool:
