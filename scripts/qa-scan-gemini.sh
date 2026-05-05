@@ -39,21 +39,126 @@ set -euo pipefail
 ISSUE_ID=""
 REPO_KEY=""
 POST_RESULTS="true"
+ALL_MODE="false"
+ALL_STATUS_FILTER="QA Ready"
+ALL_LABEL_FILTER=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo)        REPO_KEY="$2"; shift 2 ;;
     --no-post)     POST_RESULTS="false"; shift ;;
     --post)        POST_RESULTS="true"; shift ;;
+    --all)         ALL_MODE="true"; shift ;;
+    --status)      ALL_STATUS_FILTER="$2"; shift 2 ;;
+    --label)       ALL_LABEL_FILTER="$2"; shift 2 ;;
     --help|-h)     sed -n '1,30p' "$0"; exit 0 ;;
     -*)            echo "Unknown flag: $1" >&2; exit 1 ;;
     *)             ISSUE_ID="$1"; shift ;;
   esac
 done
 
-if [[ -z "$ISSUE_ID" ]]; then
+if [[ "$ALL_MODE" == "false" && -z "$ISSUE_ID" ]]; then
   echo "Usage: bash scripts/qa-scan-gemini.sh <issue-id-or-url> [--repo <repo-key>]" >&2
+  echo "       bash scripts/qa-scan-gemini.sh --all [--repo <repo-key>] [--status \"QA Ready\"] [--label qa-ready]" >&2
   exit 1
+fi
+
+# ── --all mode: fetch issue list from Linear, loop pipeline ──────────────────
+if [[ "$ALL_MODE" == "true" ]]; then
+  SCRIPT_DIR_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  LIST_SCRIPT="$SCRIPT_DIR_SELF/qa-scan-list-issues.sh"
+  if [[ ! -x "$LIST_SCRIPT" ]]; then
+    echo "ERROR: $LIST_SCRIPT not found or not executable" >&2
+    exit 1
+  fi
+
+  LIST_ARGS=()
+  [[ -n "$REPO_KEY" ]] && LIST_ARGS+=("--repo" "$REPO_KEY")
+  [[ -n "$ALL_STATUS_FILTER" ]] && LIST_ARGS+=("--status" "$ALL_STATUS_FILTER")
+  [[ -n "$ALL_LABEL_FILTER" ]] && LIST_ARGS+=("--label" "$ALL_LABEL_FILTER")
+
+  echo "[batch] fetching issue list from Linear..." >&2
+  ISSUES_JSON=$(bash "$LIST_SCRIPT" "${LIST_ARGS[@]}" 2>&1 1>/tmp/qa-scan-issues.json && cat /tmp/qa-scan-issues.json)
+  if [[ -z "$ISSUES_JSON" ]] || [[ "$ISSUES_JSON" == "[]" ]]; then
+    echo "[batch] no issues found matching filter status='$ALL_STATUS_FILTER' label='$ALL_LABEL_FILTER'" >&2
+    echo "PIPELINE_DONE verdict=ABORTED reason=no_issues_in_filter"
+    exit 0
+  fi
+
+  COUNT=$(echo "$ISSUES_JSON" | python3 -c "import sys,json; print(len(json.loads(sys.stdin.read())))" 2>/dev/null || echo "0")
+  echo "[batch] $COUNT issue(s) to scan" >&2
+
+  TIMESTAMP=$(date +%y%m%d-%H%M%S)
+  RESULTS_DIR_BASE=$(python3 -c "
+import yaml
+cfg = yaml.safe_load(open('$CONFIG_FILE' if '$CONFIG_FILE' else '.agents/qa-scan/config/qa.config.yaml'))
+print(cfg.get('defaults', {}).get('results_dir', './evidence'))
+" 2>/dev/null || echo "./evidence")
+  BATCH_DIR="${RESULTS_DIR_BASE}/_batch-${TIMESTAMP}"
+  mkdir -p "$BATCH_DIR"
+  BATCH_SUMMARY="$BATCH_DIR/summary.json"
+  echo "[]" > "$BATCH_SUMMARY"
+
+  echo "BATCH_BEGIN total=$COUNT batch_dir=$BATCH_DIR"
+
+  IDX=0
+  PASS=0; FAIL=0; PARTIAL=0; ABORTED=0
+  echo "$ISSUES_JSON" | python3 -c "
+import sys, json
+for issue in json.loads(sys.stdin.read()):
+    print(f\"{issue.get('id','')}\t{issue.get('title','')}\t{issue.get('url','')}\")
+" | while IFS=$'\t' read -r ISS_ID ISS_TITLE ISS_URL; do
+    IDX=$((IDX + 1))
+    [[ -z "$ISS_ID" ]] && continue
+    echo "" >&2
+    echo "[batch] ─── ($IDX/$COUNT) $ISS_ID — $ISS_TITLE ───" >&2
+    SUB_ARGS=("$ISS_ID")
+    [[ -n "$REPO_KEY" ]] && SUB_ARGS+=("--repo" "$REPO_KEY")
+    [[ "$POST_RESULTS" == "false" ]] && SUB_ARGS+=("--no-post")
+
+    SUB_LOG="$BATCH_DIR/${ISS_ID}.log"
+    if bash "${BASH_SOURCE[0]:-$0}" "${SUB_ARGS[@]}" > "$SUB_LOG" 2>&1; then
+      VERDICT=$(grep -oE 'PIPELINE_DONE verdict=[A-Z]+' "$SUB_LOG" | tail -1 | sed 's/PIPELINE_DONE verdict=//')
+      [[ -z "$VERDICT" ]] && VERDICT="UNKNOWN"
+    else
+      VERDICT="FAIL"
+    fi
+    echo "[batch] $ISS_ID → $VERDICT" >&2
+
+    # Append to summary
+    python3 -c "
+import json, sys
+data = json.load(open('$BATCH_SUMMARY'))
+data.append({'id': '$ISS_ID', 'title': '''$ISS_TITLE''', 'url': '$ISS_URL', 'verdict': '$VERDICT', 'log': '$SUB_LOG'})
+json.dump(data, open('$BATCH_SUMMARY', 'w'), indent=2)
+"
+  done
+
+  # Final aggregate
+  echo "" >&2
+  echo "[batch] ═══ BATCH SUMMARY ═══" >&2
+  python3 - "$BATCH_SUMMARY" "$BATCH_DIR/REPORT.md" <<'PYEOF'
+import json, sys
+from collections import Counter
+data = json.load(open(sys.argv[1]))
+counts = Counter(item['verdict'] for item in data)
+report_path = sys.argv[2]
+with open(report_path, 'w') as f:
+    f.write(f"# QA Scan Batch Report\n\n")
+    f.write(f"Total: {len(data)} issue(s)\n\n")
+    f.write("## Verdict breakdown\n\n")
+    f.write("| Verdict | Count |\n|---------|-------|\n")
+    for v in ['PASS', 'PARTIAL', 'FAIL', 'ABORTED', 'UNKNOWN']:
+        if counts.get(v, 0):
+            f.write(f"| {v} | {counts[v]} |\n")
+    f.write("\n## Per-issue\n\n")
+    f.write("| Issue | Title | Verdict | Log |\n|-------|-------|---------|-----|\n")
+    for item in data:
+        f.write(f"| {item['id']} | {item.get('title','')} | {item['verdict']} | `{item['log']}` |\n")
+print(f"PASS={counts.get('PASS',0)} PARTIAL={counts.get('PARTIAL',0)} FAIL={counts.get('FAIL',0)} ABORTED={counts.get('ABORTED',0)}")
+PYEOF
+  echo "BATCH_DONE summary=$BATCH_SUMMARY report=$BATCH_DIR/REPORT.md"
+  exit 0
 fi
 
 # ── URL → issue-key extraction (Linear / GitHub paste-friendly) ──────────────

@@ -72,8 +72,16 @@ re-run any sub-agent yourself — the bash script already handled them.
 
 ## Arguments
 
-- Single issue: `/qa-scan SKI-101`
-- With repo:    `/qa-scan SKI-101 --repo test-app`
-- Skip post:    `/qa-scan SKI-101 --no-post`
-- Batch (NYI):  `/qa-scan --all` — defer until v5.0.0
+- Single issue:        `/qa-scan SKI-101`
+- Linear URL paste:    `/qa-scan https://linear.app/cyberk/issue/SKI-101/some-slug`
+- With repo:           `/qa-scan SKI-101 --repo test-app`
+- Skip post:           `/qa-scan SKI-101 --no-post`
+- **Batch all QA**:    `/qa-scan --all` — fetch all issues with status "QA Ready" from Linear, run pipeline for each
+- Custom status filter: `/qa-scan --all --status "Ready for QA"`
+- Custom label filter:  `/qa-scan --all --label qa-pending`
+
+Batch mode produces:
+- Per-issue logs at `evidence/_batch-{ts}/{ISSUE-ID}.log`
+- Aggregate `summary.json` + `REPORT.md` markdown table with verdict counts
+- Continues on individual issue failure (PARTIAL/FAIL recorded, not aborted)
 """

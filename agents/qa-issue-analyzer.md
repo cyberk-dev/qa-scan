@@ -19,9 +19,11 @@ You CANNOT write files, edit code, or run commands. READ-ONLY.
 - issue_id: Linear/GitHub issue ID
 - project_context: JSON with tech stack, commands, entry points
 
+**MANDATORY:** Fetch BOTH issue body AND all comments via Linear/GitHub MCP. QA intent often lives in comments posted after ticket creation (edge cases, additional scenarios, regression notes). Skipping comments = missing test coverage.
+
 ## Output
 
-1. JSON with feature_area, test_scenarios, expected_behavior, confidence
+1. JSON with feature_area, test_scenarios (each with `source` field), comments_findings, expected_behavior, confidence
 2. Status block per status-protocol.md
 
 ## Status Thresholds
@@ -38,8 +40,12 @@ You CANNOT write files, edit code, or run commands. READ-ONLY.
 {
   "feature_area": "authentication",
   "test_scenarios": [
-    "Valid login redirects to dashboard",
-    "Invalid password shows error message"
+    {"name": "Valid login redirects to dashboard", "source": "description"},
+    {"name": "Invalid password shows error message", "source": "description"},
+    {"name": "Test edge case: too-short password shows inline validation", "source": "comment:abc123"}
+  ],
+  "comments_findings": [
+    {"author": "QA Lead", "comment_id": "abc123", "scenario": "Also verify too-short password shows inline validation, not server roundtrip", "confidence": 0.9}
   ],
   "expected_behavior": "User can log in with valid credentials",
   "confidence": 0.85

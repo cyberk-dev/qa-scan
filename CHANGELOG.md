@@ -2,6 +2,23 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.5.2] — 2026-05-05
+
+### Added
+
+- **`/qa-scan --all` batch mode** (was NYI, now live). Fetches all issues from Linear matching status filter (default: "QA Ready") and runs the full QA pipeline sequentially per issue. Produces aggregate report at `evidence/_batch-{ts}/REPORT.md` with verdict breakdown (PASS/PARTIAL/FAIL/ABORTED counts) + per-issue log links.
+  - New helper script `scripts/qa-scan-list-issues.sh` — spawns `gemini -p` subprocess with linear MCP loaded to fetch issue list as JSON. Consistent with existing subprocess-isolation pattern.
+  - Batch loop in `scripts/qa-scan-gemini.sh` recursively self-invokes for each issue. Individual failures don't abort batch — recorded as FAIL/UNKNOWN in summary, scan continues to next issue.
+  - Custom filter flags: `--status "Ready for QA"`, `--label qa-pending`.
+- **Comment-aware issue analyzer**. `qa-issue-analyzer` now MANDATORY-fetches all issue comments via Linear MCP `linear.list_comments({issueId})` and extracts QA intent from them (keywords: `test:`, `verify:`, `qa:`, `scenario:`, `edge case`, etc.). Most QA-relevant test scenarios are posted in comments AFTER ticket creation — skipping comments was leaking coverage.
+  - Output schema additions: each `test_scenarios[]` entry now has `source: "description" | "comment:{id}" | "label" | "title"` for traceability. New top-level `comments_findings[]` array captures raw QA-intent extractions per audit.
+
+### Why
+
+Two friction points in real workflow on mekora-fe (M1 tester run):
+1. Tester wants to scan ALL pending QA issues at once, not one at a time.
+2. Linear comments contain critical test scenarios (edge cases, regression notes) that were silently missed by analyzer reading only the description.
+
 ## [4.5.1] — 2026-05-05
 
 ### Added
