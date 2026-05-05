@@ -2,6 +2,12 @@
 
 All notable changes to qa-scan will be documented here. Follows [Semantic Versioning](https://semver.org/).
 
+## [4.5.1] — 2026-05-05
+
+### Added
+
+- **Linear / GitHub URL accepted** in `/qa-scan` slash command. Paste a full Linear issue URL (e.g. `https://linear.app/mekora/issue/MEK-123/some-slug`) — `qa-scan-gemini.sh` extracts `MEK-123` automatically. Plain issue keys still work. Removes friction of "open issue → copy key only" — testers can paste full URL.
+
 ## [4.5.0] — 2026-05-04
 
 ### Added

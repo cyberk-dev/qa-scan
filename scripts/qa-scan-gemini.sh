@@ -52,8 +52,24 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$ISSUE_ID" ]]; then
-  echo "Usage: bash scripts/qa-scan-gemini.sh <issue-id> [--repo <repo-key>]" >&2
+  echo "Usage: bash scripts/qa-scan-gemini.sh <issue-id-or-url> [--repo <repo-key>]" >&2
   exit 1
+fi
+
+# ── URL → issue-key extraction (Linear / GitHub paste-friendly) ──────────────
+# Accepts:
+#   - Plain key:   MEK-123
+#   - Linear URL:  https://linear.app/{workspace}/issue/MEK-123/some-slug
+#   - GitHub URL:  https://github.com/{org}/{repo}/issues/123  (repo is converted to KEY-NUM by analyzer)
+if [[ "$ISSUE_ID" == *"linear.app"* ]] || [[ "$ISSUE_ID" == *"github.com"* ]]; then
+  EXTRACTED=$(echo "$ISSUE_ID" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+  if [[ -n "$EXTRACTED" ]]; then
+    echo "[info] extracted issue id from URL: $EXTRACTED" >&2
+    ISSUE_ID="$EXTRACTED"
+  else
+    echo "ERROR: cannot extract issue key (e.g. MEK-123) from URL: $ISSUE_ID" >&2
+    exit 1
+  fi
 fi
 
 # ── dependency checks ────────────────────────────────────────────────────────
