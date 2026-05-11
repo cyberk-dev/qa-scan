@@ -1,0 +1,43 @@
+# QA Audit Configuration
+# Source of truth for board-wide pre-deploy audit reports.
+#
+# Each repo entry describes:
+#   - GitHub repository hosting the issues
+#   - How to filter issues that are "in scope" for an audit run
+#   - Where the PRD lives (multi-version aware)
+#
+# Filter strategy (no GitHub Projects v2 required — only `repo` scope needed):
+#   state:  open | closed | all
+#   labels: list of label names; issue must carry ALL listed labels (AND).
+#           Leave empty to skip label filtering.
+#   since:  optional ISO date (YYYY-MM-DD); only issues updated on/after this date.
+
+defaults:
+  filter:
+    state: closed
+    labels: []          # e.g. ["qa-ready"] or ["ready-for-release"]
+    since: ""           # e.g. "2026-04-01"
+  max_items: 200
+
+repos:
+  visible-brands-fe:
+    github_repo: cyberk-dev/visible-brands-fe
+    filter:
+      state: closed
+      labels: []        # TODO: add ["qa-ready"] once tester convention is in place
+      since: ""
+    prd:
+      dir: ../visible-brands/visible-brands-fe/docs/prd
+      active_version: latest     # "latest" picks file with highest semver, or pin "v1.2"
+      baseline_version: previous # "previous" picks the version before active
+
+audit:
+  # All audit artifacts (report + manifest + inputs snapshot) land here,
+  # one subfolder per run: {date}-{repo}/
+  output_dir: ./.agents/qa-audit/evidence/audits
+
+  # When --compare is omitted, auto-pick the most recent prior run for the same repo.
+  default_compare: previous
+
+  # Manual inputs file (per-run). If omitted, agent will prompt or use minimal defaults.
+  inputs_template: ./.agents/qa-audit/templates/audit-inputs.example.yaml

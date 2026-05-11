@@ -1,0 +1,29 @@
+# QA Audit — Claude Code slash command
+# Usage: /qa-audit <repo-key> [--state ...] [--labels ...] [--since YYYY-MM-DD] [--max-items N]
+
+description = "Run pre-deploy QA audit pipeline for a configured repo"
+
+prompt = """
+You are running the qa-audit pipeline for a pre-deployment audit report.
+
+## Input
+Arguments: ``
+
+## Action
+Invoke the bash orchestrator directly — it is manifest-driven and handles
+all step execution, state files, and verdict reporting. Do NOT re-implement
+the pipeline in the chat:
+
+```bash
+bash .agents/qa-audit/scripts/qa-audit-orchestrator.sh
+```
+
+## After it finishes
+- Read the latest `audit_dir` printed in `PIPELINE_DONE`.
+- Summarize: verdict, # issues collected, path to `state/01-issues.json`.
+- If `STEP_FAILED` appeared, surface the reason and stop.
+
+## Reference
+- Pipeline manifest: .agents/qa-audit/references/qa-audit-pipeline.yaml
+- Config: .agents/qa-audit/config/audit.config.yaml
+"""

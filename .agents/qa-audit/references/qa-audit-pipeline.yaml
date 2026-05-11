@@ -1,0 +1,33 @@
+# qa-audit pipeline manifest — single source of truth for both runtimes.
+#
+# Consumers:
+#   - .agents/qa-audit/scripts/qa-audit-orchestrator.sh  (bash, used by both runtimes)
+#   - .agents/qa-audit/commands/qa-audit.toml            (Claude slash command)
+#   - .gemini/commands/qa-audit.toml                     (Gemini slash command)
+#
+# Key difference vs qa-scan: qa-audit runs ONCE per audit (board-wide), not per-issue.
+# A single output dir is created per run: {output_dir}/{date}-{repo_key}/
+#
+# Schema:
+#   step:        unique id (also used as filename suffix)
+#   name:        sub-agent name (matches .agents/qa-audit/agents/<name>.md)
+#   kind:        script | agent
+#                  - script: orchestrator runs `bash <script>`; no LLM call
+#                  - agent:  orchestrator spawns `gemini -p` with the agent prompt
+#   description: human-readable label, shown in stdout markers
+#   outfile:     filename under {audit_dir}/state/
+#   script:      (kind=script only) path to bash script
+#   inputs:      (kind=agent only) named inputs the sub-agent needs in its prompt body
+#   on_failure:  abort (default) | partial
+#
+# Order matters: orchestrator iterates in declared order.
+
+steps:
+
+  - step: "1"
+    name: qa-audit-issue-collector
+    kind: script
+    description: Fetch in-scope GitHub issues for the repo
+    outfile: 01-issues.json
+    script: .agents/qa-audit/scripts/qa-audit-list-issues.sh
+    on_failure: abort

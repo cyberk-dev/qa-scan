@@ -1,0 +1,50 @@
+[
+  {
+    "id": "303",
+    "number": 303,
+    "title": "Auth | Login with email and password",
+    "url": "https://github.com/cyberk-dev/visible-brands-fe/issues/303",
+    "state": "open",
+    "labels": [],
+    "milestone": null,
+    "repo": "cyberk-dev/visible-brands-fe",
+    "assignees": [
+      "trungtb-cyberk"
+    ],
+    "author": "trungtb-cyberk",
+    "updatedAt": "2026-03-19T03:41:03Z",
+    "closedAt": null
+  },
+  {
+    "id": "258",
+    "number": 258,
+    "title": "Portfolio | Implement Technical Recommendations",
+    "url": "https://github.com/cyberk-dev/visible-brands-fe/issues/258",
+    "state": "open",
+    "labels": [],
+    "milestone": null,
+    "repo": "cyberk-dev/visible-brands-fe",
+    "assignees": [
+      "trungtb-cyberk"
+    ],
+    "author": "nghianc-cyberk",
+    "updatedAt": "2026-03-06T04:19:22Z",
+    "closedAt": null
+  },
+  {
+    "id": "257",
+    "number": 257,
+    "title": "AI Engines | Keyword Analytics UI show all models on free tier",
+    "url": "https://github.com/cyberk-dev/visible-brands-fe/issues/257",
+    "state": "open",
+    "labels": [],
+    "milestone": null,
+    "repo": "cyberk-dev/visible-brands-fe",
+    "assignees": [
+      "trungtb-cyberk"
+    ],
+    "author": "nghianc-cyberk",
+    "updatedAt": "2026-03-06T04:15:08Z",
+    "closedAt": null
+  }
+]
